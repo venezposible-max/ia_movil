@@ -281,10 +281,13 @@ export default function App() {
                 userInfo += ` Edad: ${age} años.`;
             }
 
-            // 4. ALARMAS
+            // 4. SISTEMA DE ALARMAS
             let alarmMsg = "";
-            const timeMatch = text.match(/(?:alarma|despiertame|avisame).+?(\d{1,2})[:\.](\d{2})/i);
-            const inMatch = text.match(/(?:alarma|despiertame|avisame).+?(\d+)\s*(?:min|seg)/i);
+            const alarmTimeRegex = /(?:alarma|despiertame|avisame).+?(\d{1,2})[:\.](\d{2})/i;
+            const alarmInRegex = /(?:alarma|despiertame|avisame).+?(\d+)\s*(?:min|seg)/i;
+
+            const timeMatch = text.match(alarmTimeRegex);
+            const inMatch = text.match(alarmInRegex);
 
             if (timeMatch || inMatch) {
                 let targetTime = "";
@@ -307,11 +310,22 @@ export default function App() {
                 alarmMsg = `[SISTEMA: Alarma configurada a las ${targetTime}]`;
             }
 
-            // 5. CONSTRUCCIÓN FINAL
-            const now = new Date();
-            const systemContext = `[SISTEMA: Hoy es ${now.toLocaleDateString()} ${now.toLocaleTimeString()}. ${userInfo}] ${alarmMsg} ${contextParts.join('\n')}`;
+            // 5. MODULO TAROT (LA BRUJA DIGITAL)
+            const tarotTriggers = ['tarot', 'cartas', 'futuro', 'destino', 'suerte', 'amor', 'lectura'];
+            let mysticism = "";
+            if (tarotTriggers.some(t => textLower.includes(t)) && (textLower.includes('lee') || textLower.includes('tira') || textLower.includes('dime') || textLower.includes('saber') || textLower.includes('mi'))) {
+                mysticism = `[MODO MÍSTICO ACTIVADO: El usuario pide TAROT. 
+                1. "Saca" 3 cartas aleatorias de los Arcanos Mayores.
+                2. Muestralas con emojis (ej: 🃏 LA TORRE).
+                3. Interpreta Pasado, Presente, Futuro relacionado con su pregunta.
+                4. Mantén tu personalidad de IA pero en plan "Oráculo Cyberpunk".]`;
+            }
 
-            // 5. CEREBRO ROBUSTO (ROTACIÓN DE MODELOS) - SISTEMA ANTI-CAÍDAS
+            // 6. CONSTRUCCIÓN FINAL
+            const now = new Date();
+            const systemContext = `[SISTEMA: Hoy es ${now.toLocaleDateString()} ${now.toLocaleTimeString()}. ${userInfo}] ${alarmMsg} ${contextParts.join('\n')} ${mysticism}`;
+
+            // 7. CEREBRO ROBUSTO (ROTACIÓN DE MODELOS) - SISTEMA ANTI-CAÍDAS
             const MODELS = [
                 "llama-3.1-8b-instant",    // 1. Prioridad: Velocidad
                 "llama-3.3-70b-versatile", // 2. Calidad
