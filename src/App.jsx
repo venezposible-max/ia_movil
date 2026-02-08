@@ -86,7 +86,7 @@ export default function App() {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: "llama-3.2-11b-vision-preview", // 11B es más rápido y estable para free tier
+                    model: "meta-llama/llama-4-scout-17b-16e-instruct", // NUEVO MODELO VISIÓN (2026)
                     messages: [
                         {
                             role: "user",
