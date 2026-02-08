@@ -8,8 +8,9 @@ export default defineConfig(({ mode }) => {
     return {
         plugins: [react()],
         define: {
-            'import.meta.env.VITE_GROQ_API_KEY': JSON.stringify(process.env.VITE_GROQ_API_KEY || env.VITE_GROQ_API_KEY),
-            'import.meta.env.VITE_SERPER_API_KEY': JSON.stringify(process.env.VITE_SERPER_API_KEY || env.VITE_SERPER_API_KEY),
+            // Definimos variables GLOBALES directas (saltando import.meta.env)
+            '__GROQ_KEY__': JSON.stringify(process.env.VITE_GROQ_API_KEY || env.VITE_GROQ_API_KEY || ''),
+            '__SERPER_KEY__': JSON.stringify(process.env.VITE_SERPER_API_KEY || env.VITE_SERPER_API_KEY || ''),
         }
     }
 })
