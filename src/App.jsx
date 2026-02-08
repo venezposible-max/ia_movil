@@ -403,7 +403,7 @@ export default function App() {
                     <button
                         onClick={stopCamera}
                         style={{
-                            position: 'absolute', bottom: 'calc(30px + env(safe-area-inset-bottom))', left: '20px',
+                            position: 'absolute', bottom: 'calc(120px + env(safe-area-inset-bottom))', left: '20px',
                             background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)',
                             borderRadius: '30px', padding: '12px 24px', fontSize: '1rem', fontWeight: 'bold', zIndex: 100,
                             backdropFilter: 'blur(5px)'
@@ -416,7 +416,7 @@ export default function App() {
                         onClick={analyzeImage}
                         disabled={isAnalyzing}
                         style={{
-                            position: 'absolute', bottom: 'calc(30px + env(safe-area-inset-bottom))',
+                            position: 'absolute', bottom: 'calc(120px + env(safe-area-inset-bottom))',
                             left: '50%', transform: 'translateX(-50%)',
                             background: isAnalyzing ? '#555' : '#fff',
                             color: '#000', border: '4px solid rgba(255,255,255,0.5)',
