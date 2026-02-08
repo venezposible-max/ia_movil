@@ -191,11 +191,41 @@ export default function App() {
         if (abortControllerRef.current) abortControllerRef.current.abort();
         abortControllerRef.current = new AbortController();
 
-        // INTENCIÓN DE BÚSQUEDA
-        const searchKeywords = ['precio', 'noticia', 'última hora', 'sucedió', 'pasó', 'actualidad', 'clima', 'cuánto', 'falleció', 'ganó', 'resultado', 'sismo', 'temblor'];
-        const needsSearch = searchKeywords.some(kw => text.toLowerCase().includes(kw));
-
+        // INTENCIÓN DE BÚSQUEDA Y CRIPTO
         let searchContext = '';
+        const textLower = text.toLowerCase();
+
+        // 1. RADAR CRIPTO (BINANCE)
+        const cryptoMap = {
+            'bitcoin': 'BTCUSDT', 'btc': 'BTCUSDT',
+            'ethereum': 'ETHUSDT', 'eth': 'ETHUSDT',
+            'solana': 'SOLUSDT', 'sol': 'SOLUSDT',
+            'bnb': 'BNBUSDT', 'doge': 'DOGEUSDT',
+            'cardano': 'ADAUSDT', 'ada': 'ADAUSDT',
+            'xrp': 'XRPUSDT', 'ripple': 'XRPUSDT'
+        };
+
+        let cryptoSymbol = null;
+        for (const [key, val] of Object.entries(cryptoMap)) {
+            if (textLower.includes(key)) { cryptoSymbol = val; break; }
+        }
+
+        if (cryptoSymbol) {
+            try {
+                const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${cryptoSymbol}`);
+                const data = await res.json();
+                if (data.price) {
+                    const price = parseFloat(data.price).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+                    searchContext = `[DATOS_TIEMPO_REAL: Precio de ${cryptoSymbol} es ${price}].`;
+                }
+            } catch (e) {
+                console.error("Error Binance", e);
+            }
+        }
+
+        // 2. RADAR GOOGLE (Si no es cripto o queremos más info)
+        const searchKeywords = ['precio', 'noticia', 'última hora', 'sucedió', 'pasó', 'actualidad', 'clima', 'cuánto', 'falleció', 'ganó', 'resultado', 'sismo', 'temblor'];
+        const needsSearch = !searchContext && searchKeywords.some(kw => textLower.includes(kw));
 
         if (needsSearch && SERPER_API_KEY) {
             try {
