@@ -227,11 +227,52 @@ export default function App() {
 
     const speak = (text) => {
         if (synthRef.current.speaking) synthRef.current.cancel();
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = 'es-US';
-        u.onstart = () => setIsSpeaking(true);
-        u.onend = () => setIsSpeaking(false);
-        synthRef.current.speak(u);
+
+        // Limpiamos el texto de asteriscos o formato raro antes de hablar
+        const cleanText = text.replace(/[*#]/g, '').replace(/(\d)\.(\d{3})(?!\d)/g, '$1$2'); // Quita formato mil (1.000 -> 1000)
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+
+        // Pista para el motor: Preferir español latino
+        utterance.lang = 'es-MX';
+
+        const voices = synthRef.current.getVoices();
+
+        // 1. Filtrar todas las voces en español
+        const esVoices = voices.filter(v => v.lang.toLowerCase().includes('es'));
+
+        // 2. Buscar voces LATINAS específicas (México, US, 419)
+        const latinVoices = esVoices.filter(v =>
+            v.lang.includes('MX') || v.lang.includes('US') || v.lang.includes('419') ||
+            v.name.includes('Mexico') || v.name.includes('Paulina') || v.name.includes('Sabina')
+        );
+
+        // 3. Selección prioritaria
+        let selectedVoice = null;
+
+        if (latinVoices.length > 0) {
+            // Si hay latinas, cogemos la primera (Paulina suele ser la mejor en iOS)
+            // Intentamos buscar 'Paulina' específicamente primero
+            const paulina = latinVoices.find(v => v.name.toLowerCase().includes('paulina'));
+            selectedVoice = paulina || latinVoices[0];
+        } else {
+            // Si no hay latinas detectadas explícitamente, usamos la primera en español que encontremos
+            // (evitando Monica si es posible, que es española)
+            selectedVoice = esVoices.find(v => !v.name.toLowerCase().includes('monica')) || esVoices[0];
+        }
+
+        if (selectedVoice) {
+            utterance.voice = selectedVoice;
+            // console.log("Voz seleccionada:", selectedVoice.name, selectedVoice.lang);
+        }
+
+        utterance.pitch = 1.0; // Tono natural
+        utterance.rate = 1.1;  // Un pelín más rápido, más fluido
+
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => setIsSpeaking(false);
+
+        synthRef.current.speak(utterance);
     };
 
     const toggleListening = () => {
