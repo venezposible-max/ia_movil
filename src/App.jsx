@@ -226,6 +226,10 @@ export default function App() {
             <div className='header'>
                 <h1>⚡ OLGA AI</h1>
                 <p>Neural Network • Llama 3 • Live Search</p>
+                {/* DEBUG INDICATOR */}
+                <span style={{ fontSize: '0.7rem', color: API_KEY ? '#4caf50' : '#ff5555', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '10px' }}>
+                    {API_KEY ? '✅ Sistema Online' : `❌ Falta API Key (${API_KEY?.length || 0})`}
+                </span>
             </div>
 
             <button
