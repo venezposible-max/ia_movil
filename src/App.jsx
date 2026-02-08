@@ -197,9 +197,23 @@ export default function App() {
             } catch (e) { console.error(e); }
         }
 
-        // 3. INYECCIÓN TIEMPO REAL
+        // 3. INYECCIÓN DE CONTEXTO PERSONAL (NOMBRE Y FECHA)
         const now = new Date();
-        const timeInfo = `[SISTEMA: Hoy es ${now.toLocaleDateString()} ${now.toLocaleTimeString()}. ERES UNA IA ACTUALIZADA AL 2026].`;
+        let userInfo = `Usuario Anónimo.`;
+
+        if (userNameRef.current) {
+            userInfo = `Usuario: ${userNameRef.current}.`;
+        }
+
+        if (userBirthDateRef.current) {
+            const birth = new Date(userBirthDateRef.current);
+            const ageDifMs = Date.now() - birth.getTime();
+            const ageDate = new Date(ageDifMs); // milisegundos desde epoch
+            const age = Math.abs(ageDate.getUTCFullYear() - 1970);
+            userInfo += ` Edad: ${age} años (Nació: ${userBirthDateRef.current}).`;
+        }
+
+        const timeInfo = `[SISTEMA: Hoy es ${now.toLocaleDateString()} ${now.toLocaleTimeString()}. ${userInfo}]`;
 
         try {
             const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -208,7 +222,7 @@ export default function App() {
                 body: JSON.stringify({
                     model: "llama-3.3-70b-versatile",
                     messages: [
-                        { role: "system", content: `Eres OLGA. Responde corto. IMPORTANTE: Tu conocimiento base es viejo. Si hay [RESULTADOS BÚSQUEDA], ÚSALOS como verdad absoluta. ${timeInfo}` },
+                        { role: "system", content: `Eres OLGA, una IA leal y útil. ${userInfo} Responde de forma personal usando el nombre del usuario si viene al caso. Si hay resultados de búsqueda, úsalos sobre tu base de conocimientos.` },
                         ...messagesRef.current.slice(-10).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
                         { role: "user", content: text + searchContext + "\n" + timeInfo }
                     ],
