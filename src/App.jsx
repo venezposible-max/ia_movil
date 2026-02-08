@@ -99,6 +99,31 @@ export default function App() {
 
     useEffect(() => { messagesRef.current = messages; }, [messages]);
 
+    // WAKE LOCK (Mantener pantalla encendida para alarmas)
+    useEffect(() => {
+        let wakeLock = null;
+        const requestWakeLock = async () => {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('💡 Pantalla mantenida encendida (Wake Lock activo)');
+                } catch (err) {
+                    console.error(`${err.name}, ${err.message}`);
+                }
+            }
+        };
+
+        const handleVisibilityChange = () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                requestWakeLock();
+            }
+        };
+
+        requestWakeLock();
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, []);
+
     // --- RECONOCIMIENTO DE VOZ ---
     useEffect(() => {
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
