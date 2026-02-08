@@ -301,7 +301,7 @@ export default function App() {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    model: "mixtral-8x7b-32768", // CAMBIO POR CUOTA LLAMA AGOTADA
+                    model: "gemma2-9b-it", // MODELO GOOGLE (CUOTA SEPARADA)
                     messages: [
                         { role: "system", content: `Eres OLGA, asistente virtual en español. ${userInfo} IMPORTANTE: ERES ÚTIL Y BREVE. Si hay alarmas o noticias, confírmalo.` },
                         ...messagesRef.current.slice(-6).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })), // Reducimos contexto a 6 para evitar overflow
