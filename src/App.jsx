@@ -16,6 +16,20 @@ export default function App() {
     const [userBirthDate, setUserBirthDate] = useState(() => localStorage.getItem('olga_user_birth') || '');
     const [showSettings, setShowSettings] = useState(false);
 
+    // TOKENS (CONSUMO DIARIO)
+    const [dailyTokens, setDailyTokens] = useState(() => {
+        const saved = localStorage.getItem('olga_tokens_v1');
+        const lastDate = localStorage.getItem('olga_last_reset');
+        const today = new Date().toDateString();
+        if (lastDate !== today) {
+            localStorage.setItem('olga_last_reset', today);
+            return 0; // Nuevo día, nuevo contador
+        }
+        return saved ? parseInt(saved) : 0;
+    });
+
+    useEffect(() => { localStorage.setItem('olga_tokens_v1', dailyTokens); }, [dailyTokens]);
+
     // SELECCIÓN DE VOZ
     const [availableVoices, setAvailableVoices] = useState([]);
     const [selectedVoiceName, setSelectedVoiceName] = useState(() => localStorage.getItem('olga_voice_name') || '');
@@ -332,7 +346,13 @@ export default function App() {
 
                     const data = await response.json();
                     aiText = data.choices[0].message.content;
-                    break; // ¡Éxito! 
+
+                    // TRACKING TOKENS
+                    const inputTokens = Math.ceil((text.length + systemContext.length) / 4);
+                    const outputTokens = Math.ceil(aiText.length / 4);
+                    setDailyTokens(prev => prev + inputTokens + outputTokens);
+
+                    break; // ¡Éxito!  
                 } catch (e) {
                     console.warn(`⚠️ Falló ${modelId}:`, e.message);
                     lastError = e;
@@ -591,6 +611,14 @@ export default function App() {
                             placeholder="Ej: Franklin"
                             style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '10px', border: 'none', background: '#222', color: '#fff' }}
                         />
+
+                        <div style={{ background: '#222', padding: '15px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #333' }}>
+                            <label style={{ display: 'block', marginBottom: '5px', color: '#aaa', fontSize: '0.8rem' }}>CONSUMO HOY (Tokens):</label>
+                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: dailyTokens > 90000 ? '#ff5555' : '#00ff88' }}>
+                                ⛽ {dailyTokens.toLocaleString()} / ~100k
+                            </div>
+                            <small style={{ color: '#666', fontSize: '0.7rem' }}>Si llegas al límite, OLGA cambiará de cerebro automáticamente.</small>
+                        </div>
 
                         <label style={{ display: 'block', marginBottom: '8px', color: '#aaa', fontSize: '0.9rem' }}>Fecha de Nacimiento:</label>
                         <input
