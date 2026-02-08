@@ -273,11 +273,17 @@ export default function App() {
                         className={`orb-button ${isListening ? 'listening' : ''} ${isThinking ? 'thinking' : ''} ${isSpeaking ? 'speaking' : ''}`}
                         onClick={toggleListening}
                     >
-                        <div className="icon" style={{ fontSize: '3rem' }}>
-                            {isThinking ? <Loader className='icon spin' size={64} /> :
-                                isSpeaking ? <Volume2 className='icon' size={64} /> :
-                                    isListening ? <Mic className='icon' size={64} /> :
-                                        <Bot size={64} />}
+                        {/* AVATAR REALISTA - SIEMPRE VISIBLE */}
+                        <img
+                            src="/avatar.png"
+                            className="avatar-img"
+                            alt="OLGA AI"
+                            onError={(e) => { e.target.style.display = 'none'; }} // Fallback invisible si no copian la imagen
+                        />
+
+                        {/* Fallback Icon si la imagen falla (opcional) */}
+                        <div className="icon-fallback" style={{ position: 'absolute', zIndex: -1 }}>
+                            <Bot size={64} color="#fff" />
                         </div>
                     </button>
                     <div className='status-text'>
