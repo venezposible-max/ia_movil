@@ -67,8 +67,15 @@ export default function App() {
         const context = canvasRef.current.getContext('2d');
         canvasRef.current.width = videoRef.current.videoWidth;
         canvasRef.current.height = videoRef.current.videoHeight;
-        context.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
-        const imageBase64 = canvasRef.current.toDataURL('image/jpeg', 0.5); // Calidad media para velocidad
+        // RESIZE LÓGICO
+        const MAX_WIDTH = 512;
+        let width = videoRef.current.videoWidth;
+        let height = videoRef.current.videoHeight;
+        if (width > MAX_WIDTH) { const s = MAX_WIDTH / width; width = MAX_WIDTH; height = height * s; }
+
+        canvasRef.current.width = width; canvasRef.current.height = height;
+        context.drawImage(videoRef.current, 0, 0, width, height);
+        const imageBase64 = canvasRef.current.toDataURL('image/jpeg', 0.6);
 
         try {
             // 2. ENVIAR A LLAMA 3.2 VISION
@@ -102,7 +109,9 @@ export default function App() {
 
         } catch (e) {
             console.error(e);
-            speak("No pude ver bien. Intenta otra vez.");
+            const msg = e.message || "Error desconocido";
+            speak("Error visual: " + msg);
+            setError("Fallo Visión: " + msg);
         } finally {
             setIsAnalyzing(false);
         }
@@ -353,12 +362,13 @@ export default function App() {
                     <button
                         onClick={stopCamera}
                         style={{
-                            position: 'absolute', top: '40px', left: '20px',
-                            background: 'rgba(0,0,0,0.5)', color: '#fff', border: 'none',
-                            borderRadius: '50%', width: '40px', height: '40px', fontSize: '1.5rem', zIndex: 10
+                            position: 'absolute', bottom: '50px', left: '30px', // ABAJO A LA IZQUIERDA
+                            background: 'rgba(255,255,255,0.2)', color: '#fff', border: '1px solid rgba(255,255,255,0.4)',
+                            borderRadius: '15px', padding: '10px 20px', fontSize: '1rem', fontWeight: 'bold', zIndex: 20,
+                            backdropFilter: 'blur(5px)'
                         }}
                     >
-                        ❌
+                        ⬅️ Volver
                     </button>
 
                     <button
