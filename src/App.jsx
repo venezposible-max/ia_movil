@@ -180,6 +180,13 @@ export default function App() {
         if (isListening) {
             recognitionRef.current?.stop();
         } else {
+            // TRUCO PARA MOVILES: Despertar el audio con un silbido silencioso
+            // Esto "abre" el canal de audio para que luego la IA pueda hablar
+            const wakeUp = new SpeechSynthesisUtterance(" ");
+            wakeUp.volume = 0; // Silencio
+            synthRef.current.speak(wakeUp);
+            // Fin del truco
+
             setError('');
             recognitionRef.current?.start();
         }
