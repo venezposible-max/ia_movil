@@ -390,10 +390,10 @@ export default function App() {
                 👁️
             </button>
 
-            {/* PANTALLA DE CÁMARA (VISOR) */}
+            {/* PANTALLA DE CÁMARA (VISOR) - OPTIMIZADO MOVIL */}
             {showCamera && (
                 <div style={{
-                    position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+                    position: 'fixed', top: 0, left: 0, width: '100%', height: '100dvh', // DVH para móviles
                     background: '#000', zIndex: 99999, display: 'flex', flexDirection: 'column'
                 }}>
                     <video ref={videoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -403,9 +403,9 @@ export default function App() {
                     <button
                         onClick={stopCamera}
                         style={{
-                            position: 'absolute', bottom: '50px', left: '30px', // ABAJO A LA IZQUIERDA
-                            background: 'rgba(255,255,255,0.2)', color: '#fff', border: '1px solid rgba(255,255,255,0.4)',
-                            borderRadius: '15px', padding: '10px 20px', fontSize: '1rem', fontWeight: 'bold', zIndex: 20,
+                            position: 'absolute', bottom: 'calc(30px + env(safe-area-inset-bottom))', left: '20px',
+                            background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)',
+                            borderRadius: '30px', padding: '12px 24px', fontSize: '1rem', fontWeight: 'bold', zIndex: 100,
                             backdropFilter: 'blur(5px)'
                         }}
                     >
@@ -416,12 +416,13 @@ export default function App() {
                         onClick={analyzeImage}
                         disabled={isAnalyzing}
                         style={{
-                            position: 'absolute', bottom: '50px', left: '50%', transform: 'translateX(-50%)',
+                            position: 'absolute', bottom: 'calc(30px + env(safe-area-inset-bottom))',
+                            left: '50%', transform: 'translateX(-50%)',
                             background: isAnalyzing ? '#555' : '#fff',
-                            color: '#000', border: '5px solid rgba(255,255,255,0.3)',
+                            color: '#000', border: '4px solid rgba(255,255,255,0.5)',
                             borderRadius: '50%', width: '80px', height: '80px',
-                            fontSize: '2rem', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            boxShadow: '0 0 20px rgba(255,255,255,0.5)'
+                            fontSize: '2.5rem', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: '0 0 25px rgba(255,255,255,0.4)'
                         }}
                     >
                         {isAnalyzing ? '⏳' : '📸'}
@@ -431,7 +432,7 @@ export default function App() {
                         <div style={{
                             position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
                             color: '#00f3ff', fontSize: '1.5rem', fontWeight: 'bold', background: 'rgba(0,0,0,0.7)',
-                            padding: '10px 20px', borderRadius: '20px'
+                            padding: '10px 20px', borderRadius: '20px', pointerEvents: 'none', zIndex: 101
                         }}>
                             🧠 Analizando...
                         </div>
