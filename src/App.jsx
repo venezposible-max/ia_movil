@@ -86,7 +86,7 @@ export default function App() {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: "llama-3.2-11b-vision-preview", // MODELO DE VISIÓN
+                    model: "llama-3.2-90b-vision-preview", // MODELO DE VISIÓN
                     messages: [
                         {
                             role: "user",
