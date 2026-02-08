@@ -316,7 +316,7 @@ export default function App() {
                         body: JSON.stringify({
                             model: modelId,
                             messages: [
-                                { role: "system", content: `Eres OLGA, asistente virtual en español. ${userInfo} IMPORTANTE: ERES ÚTIL Y BREVE. Responde siempre en Español.` },
+                                { role: "system", content: `Eres OLGA, asistente virtual en español. ${userInfo} [MODELO ACTIVO: ${modelId}] IMPORTANTE: ERES ÚTIL Y BREVE. Responde siempre en Español.` },
                                 ...messagesRef.current.slice(-6).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
                                 { role: "user", content: text + "\n" + systemContext }
                             ],
