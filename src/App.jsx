@@ -16,6 +16,20 @@ export default function App() {
     const [userBirthDate, setUserBirthDate] = useState(() => localStorage.getItem('olga_user_birth') || '');
     const [showSettings, setShowSettings] = useState(false);
 
+    // SELECCIÓN DE VOZ
+    const [availableVoices, setAvailableVoices] = useState([]);
+    const [selectedVoiceName, setSelectedVoiceName] = useState(() => localStorage.getItem('olga_voice_name') || '');
+
+    useEffect(() => {
+        const loadVoices = () => {
+            const voices = window.speechSynthesis.getVoices();
+            const esVoices = voices.filter(v => v.lang.toLowerCase().includes('es'));
+            setAvailableVoices(esVoices);
+        };
+        loadVoices();
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+    }, []);
+
     const userNameRef = useRef(userName);
     const userBirthDateRef = useRef(userBirthDate);
     const messagesRef = useRef([]);
@@ -225,48 +239,37 @@ export default function App() {
         }
     };
 
-    const speak = (text) => {
+    const speak = (text, forceVoiceName = null) => {
         if (synthRef.current.speaking) synthRef.current.cancel();
 
-        // Limpiamos el texto de asteriscos o formato raro antes de hablar
-        const cleanText = text.replace(/[*#]/g, '').replace(/(\d)\.(\d{3})(?!\d)/g, '$1$2'); // Quita formato mil (1.000 -> 1000)
+        const cleanText = text.replace(/[*#]/g, '').replace(/(\d)\.(\d{3})(?!\d)/g, '$1$2');
         const utterance = new SpeechSynthesisUtterance(cleanText);
 
-        // Pista para el motor: Preferir español latino
-        utterance.lang = 'es-MX';
-
-        const voices = synthRef.current.getVoices();
-
-        // 1. Filtrar todas las voces en español
-        const esVoices = voices.filter(v => v.lang.toLowerCase().includes('es'));
-
-        // 2. Buscar voces LATINAS específicas (México, US, 419)
-        const latinVoices = esVoices.filter(v =>
-            v.lang.includes('MX') || v.lang.includes('US') || v.lang.includes('419') ||
-            v.name.includes('Mexico') || v.name.includes('Paulina') || v.name.includes('Sabina')
-        );
-
-        // 3. Selección prioritaria
+        // 1. VOZ (Usuario o Auto)
+        const targetName = forceVoiceName || selectedVoiceName;
+        const allVoices = window.speechSynthesis.getVoices();
         let selectedVoice = null;
 
-        if (latinVoices.length > 0) {
-            // Si hay latinas, cogemos la primera (Paulina suele ser la mejor en iOS)
-            // Intentamos buscar 'Paulina' específicamente primero
-            const paulina = latinVoices.find(v => v.name.toLowerCase().includes('paulina'));
-            selectedVoice = paulina || latinVoices[0];
-        } else {
-            // Si no hay latinas detectadas explícitamente, usamos la primera en español que encontremos
-            // (evitando Monica si es posible, que es española)
-            selectedVoice = esVoices.find(v => !v.name.toLowerCase().includes('monica')) || esVoices[0];
+        if (targetName) {
+            selectedVoice = allVoices.find(v => v.name === targetName);
+        }
+
+        if (!selectedVoice) {
+            const esVoices = allVoices.filter(v => v.lang.toLowerCase().includes('es'));
+            selectedVoice = esVoices.find(v =>
+                v.name.includes('Paulina') || v.name.includes('Mexico') || v.name.includes('Google español de Estados Unidos')
+            ) || esVoices.find(v => !v.name.toLowerCase().includes('monica')) || esVoices[0];
         }
 
         if (selectedVoice) {
             utterance.voice = selectedVoice;
-            // console.log("Voz seleccionada:", selectedVoice.name, selectedVoice.lang);
+            utterance.lang = selectedVoice.lang;
+        } else {
+            utterance.lang = 'es-MX';
         }
 
-        utterance.pitch = 1.0; // Tono natural
-        utterance.rate = 1.1;  // Un pelín más rápido, más fluido
+        utterance.pitch = 1.0;
+        utterance.rate = 1.1;
 
         utterance.onstart = () => setIsSpeaking(true);
         utterance.onend = () => setIsSpeaking(false);
@@ -422,6 +425,28 @@ export default function App() {
                 }}>
                     <div style={{ width: '85%', maxWidth: '350px', color: '#fff', textAlign: 'left', background: '#111', padding: '25px', borderRadius: '20px', border: '1px solid #333' }}>
                         <h2 style={{ textAlign: 'center', margin: '0 0 20px 0', color: '#00f3ff' }}>⚙️ Ajustes</h2>
+
+                        <label style={{ display: 'block', marginBottom: '5px', color: '#aaa', fontSize: '0.9rem' }}>Voz de OLGA:</label>
+                        <select
+                            value={selectedVoiceName}
+                            onChange={(e) => {
+                                setSelectedVoiceName(e.target.value);
+                                localStorage.setItem('olga_voice_name', e.target.value);
+                                speak("Soy OLGA.", e.target.value);
+                            }}
+                            style={{
+                                width: '100%', padding: '12px', marginBottom: '20px',
+                                borderRadius: '10px', background: '#222', color: '#fff', border: '1px solid #444',
+                                fontSize: '0.9rem'
+                            }}
+                        >
+                            <option value="">-- Automática (Mejor) --</option>
+                            {availableVoices.map(v => (
+                                <option key={v.name} value={v.name}>
+                                    {v.name.replace('Microsoft ', '').replace('Google ', '').substring(0, 30)} ({v.lang})
+                                </option>
+                            ))}
+                        </select>
 
                         <label style={{ display: 'block', marginBottom: '8px', color: '#aaa', fontSize: '0.9rem' }}>Tu Nombre:</label>
                         <input
