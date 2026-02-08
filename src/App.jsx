@@ -120,8 +120,9 @@ export default function App() {
         } catch (e) {
             console.error(e);
             const msg = e.message || "Error desconocido";
-            speak("Error visual: " + msg);
+            speak("Error visual.");
             setError("Fallo Visión: " + msg);
+            window.alert("❌ Error Visión:\n" + msg); // ALERTA VISUAL
         } finally {
             setIsAnalyzing(false);
         }
