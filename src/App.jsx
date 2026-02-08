@@ -156,28 +156,36 @@ export default function App() {
             } catch (e) { }
         }
 
-        // 2. BUSCADOR GOOGLE (RECUPERADO)
-        const searchKeywords = ['precio', 'noticia', 'última hora', 'sucedió', 'pasó', 'actualidad', 'clima', 'cuánto', 'falleció', 'ganó', 'resultado', 'sismo', 'temblor', 'quién es', 'qué es', 'buscar'];
-        const needsSearch = !searchContext && searchKeywords.some(kw => text.toLowerCase().includes(kw));
+        // 2. BUSCADOR GOOGLE (MODO NOTICIAS AGRESIVO)
+        // Palabras que ACTIVAN la búsqueda obligatoria para no alucinar con datos viejos
+        const newsTriggers = [
+            'precio', 'noticia', 'última hora', 'sucedió', 'pasó', 'actualidad', 'clima',
+            'falleció', 'ganó', 'resultado', 'sismo', 'temblor', 'quién es', 'qué es', 'buscar',
+            'dónde está', 'donde esta', 'preso', 'cárcel', 'situación', 'gobierno',
+            'maduro', 'corina', 'edmundo', 'venezuela', 'trump', 'biden', 'putin' // Nombres clave política
+        ];
+
+        const needsSearch = !searchContext && newsTriggers.some(kw => text.toLowerCase().includes(kw));
 
         if (needsSearch && SERPER_API_KEY) {
             try {
+                // console.log("Buscando noticias recientes...");
                 const searchRes = await fetch('https://google.serper.dev/search', {
                     method: 'POST',
                     headers: { 'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ q: text, gl: 've', hl: 'es' })
+                    body: JSON.stringify({ q: text + " noticias hoy 2026", gl: 've', hl: 'es' }) // Forzamos contexto reciente
                 });
                 const searchData = await searchRes.json();
                 if (searchData.organic && searchData.organic.length > 0) {
-                    const topResults = searchData.organic.slice(0, 3).map(r => `- ${r.title}: ${r.snippet}`).join('\n');
-                    searchContext += `\n\n[RESULTADOS BÚSQUEDA]:\n${topResults}`;
+                    const topResults = searchData.organic.slice(0, 5).map(r => `[FUENTE: ${r.title}] -> ${r.snippet}`).join('\n'); // 5 resultados
+                    searchContext += `\n\n[MUNDO REAL (IGNORA TU ENTRENAMIENTO SI CHOCA CON ESTO)]:\n${topResults}`;
                 }
             } catch (e) { console.error(e); }
         }
 
         // 3. INYECCIÓN TIEMPO REAL
         const now = new Date();
-        const timeInfo = `[SISTEMA: Hoy es ${now.toLocaleDateString()} ${now.toLocaleTimeString()}].`;
+        const timeInfo = `[SISTEMA: Hoy es ${now.toLocaleDateString()} ${now.toLocaleTimeString()}. ERES UNA IA ACTUALIZADA AL 2026].`;
 
         try {
             const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -186,7 +194,7 @@ export default function App() {
                 body: JSON.stringify({
                     model: "llama-3.3-70b-versatile",
                     messages: [
-                        { role: "system", content: `Eres OLGA, una IA avanzada y sarcástica. Responde brevemente. ${timeInfo}` },
+                        { role: "system", content: `Eres OLGA. Responde corto. IMPORTANTE: Tu conocimiento base es viejo. Si hay [RESULTADOS BÚSQUEDA], ÚSALOS como verdad absoluta. ${timeInfo}` },
                         ...messagesRef.current.slice(-10).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
                         { role: "user", content: text + searchContext + "\n" + timeInfo }
                     ],
