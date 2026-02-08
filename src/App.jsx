@@ -226,122 +226,98 @@ export default function App() {
         if (abortControllerRef.current) abortControllerRef.current.abort();
         abortControllerRef.current = new AbortController();
 
-        // 1. CRIPTO CHECK
-        let searchContext = '';
-        const cryptoMap = { 'bitcoin': 'BTCUSDT', 'btc': 'BTCUSDT', 'ethereum': 'ETHUSDT', 'eth': 'ETHUSDT', 'solana': 'SOLUSDT' };
-        let cryptoSymbol = null;
-        for (const [key, val] of Object.entries(cryptoMap)) { if (text.toLowerCase().includes(key)) { cryptoSymbol = val; break; } }
-
-        if (cryptoSymbol) {
-            try {
-                const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${cryptoSymbol}`);
-                const data = await res.json();
-                if (data.price) searchContext = `[PRECIO ${cryptoSymbol}: $${parseFloat(data.price).toFixed(2)}] `;
-            } catch (e) { }
-        }
-
-        // 2. BUSCADOR GOOGLE (MODO NOTICIAS AGRESIVO)
-        // Palabras que ACTIVAN la búsqueda obligatoria para no alucinar con datos viejos
-        const newsTriggers = [
-            'precio', 'noticia', 'última hora', 'sucedió', 'pasó', 'actualidad', 'clima',
-            'falleció', 'ganó', 'resultado', 'sismo', 'temblor', 'quién es', 'qué es', 'buscar',
-            'dónde está', 'donde esta', 'preso', 'cárcel', 'situación', 'gobierno',
-            'maduro', 'corina', 'edmundo', 'venezuela', 'trump', 'biden', 'putin' // Nombres clave política
-        ];
-
-        const needsSearch = !searchContext && newsTriggers.some(kw => text.toLowerCase().includes(kw));
-
-        if (needsSearch && SERPER_API_KEY) {
-            try {
-                // console.log("Buscando noticias recientes...");
-                const searchRes = await fetch('https://google.serper.dev/search', {
-                    method: 'POST',
-                    headers: { 'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ q: text + " noticias hoy 2026", gl: 've', hl: 'es' }) // Forzamos contexto reciente
-                });
-                const searchData = await searchRes.json();
-                if (searchData.organic && searchData.organic.length > 0) {
-                    const topResults = searchData.organic.slice(0, 5).map(r => `[FUENTE: ${r.title}] -> ${r.snippet}`).join('\n'); // 5 resultados
-                    searchContext += `\n\n[MUNDO REAL (IGNORA TU ENTRENAMIENTO SI CHOCA CON ESTO)]:\n${topResults}`;
-                }
-            } catch (e) { console.error(e); }
-        }
-
-        // 3. INYECCIÓN DE CONTEXTO PERSONAL (NOMBRE Y FECHA)
-        const now = new Date();
-        let userInfo = `Usuario Anónimo.`;
-
-        if (userNameRef.current) {
-            userInfo = `Usuario: ${userNameRef.current}.`;
-        }
-
-        if (userBirthDateRef.current) {
-            const birth = new Date(userBirthDateRef.current);
-            const ageDifMs = Date.now() - birth.getTime();
-            const ageDate = new Date(ageDifMs); // milisegundos desde epoch
-            const age = Math.abs(ageDate.getUTCFullYear() - 1970);
-            userInfo += ` Edad: ${age} años (Nació: ${userBirthDateRef.current}).`;
-        }
-
-        // 4. SISTEMA DE ALARMAS (REGEX)
-        // Patrones: "alarma a las 10:30", "despiertame a las 7:00", "avisame en 5 minutos"
-        const alarmTimeRegex = /(?:alarma|despiertame|avisame).+?(\d{1,2})[:\.](\d{2})/i;
-        const alarmInRegex = /(?:alarma|despiertame|avisame).+?(\d+)\s*(?:min|seg)/i; // "en 5 min"
-
-        let alarmContext = '';
-        let triggerAlarm = null;
-
-        const setAlarm = (time, label) => {
-            const newAlarm = { time, label, id: Date.now() };
-            setAlarms(prev => [...prev, newAlarm]);
-            return `[SISTEMA: Alarma configurada para las ${time}]`;
-        };
-
-        const matchTime = text.match(alarmTimeRegex);
-        const matchIn = text.match(alarmInRegex);
-
-        if (matchTime) {
-            let h = parseInt(matchTime[1]);
-            const m = matchTime[2].padStart(2, '0');
-            // Asumimos AM/PM si el usuario no especifica, o formato 24h
-            if (text.toLowerCase().includes('pm') && h < 12) h += 12;
-            else if (text.toLowerCase().includes('am') && h === 12) h = 0;
-
-            const timeStr = `${h.toString().padStart(2, '0')}:${m}`;
-            alarmContext = setAlarm(timeStr, "Alarma programada");
-        } else if (matchIn) {
-            const num = parseInt(matchIn[1]);
-            const isSeg = text.includes('seg');
-            const targetDate = new Date(Date.now() + num * (isSeg ? 1000 : 60000));
-            const timeStr = `${targetDate.getHours().toString().padStart(2, '0')}:${targetDate.getMinutes().toString().padStart(2, '0')}`;
-            alarmContext = setAlarm(timeStr, `Timer de ${num} ${isSeg ? 'seg' : 'min'}`);
-        }
-
-        const timeInfo = `[SISTEMA: Hoy es ${now.toLocaleDateString()} ${now.toLocaleTimeString()}. ${userInfo} ${alarmContext}]`;
-
         try {
+            let contextParts = [];
+            const textLower = text.toLowerCase();
+
+            // 1. CRIPTO CHECK
+            const cryptoMap = { 'bitcoin': 'BTCUSDT', 'btc': 'BTCUSDT', 'ethereum': 'ETHUSDT', 'eth': 'ETHUSDT', 'solana': 'SOLUSDT' };
+            let cryptoSymbol = null;
+            for (const [key, val] of Object.entries(cryptoMap)) { if (textLower.includes(key)) { cryptoSymbol = val; break; } }
+            if (cryptoSymbol) {
+                try {
+                    const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${cryptoSymbol}`);
+                    const data = await res.json();
+                    if (data.price) contextParts.push(`[PRECIO ${cryptoSymbol}: $${parseFloat(data.price).toFixed(2)}]`);
+                } catch (e) { }
+            }
+
+            // 2. NOTICIAS (POLÍTICA Y ACTUALIDAD)
+            const newsTriggers = ['precio', 'noticia', 'última hora', 'pasó', 'actualidad', 'falleció', 'ganó', 'sismo', 'maduro', 'corina', 'venezuela', 'trump', 'biden', 'dónde está', 'donde esta', 'preso', 'situación'];
+            if (newsTriggers.some(kw => textLower.includes(kw)) && SERPER_API_KEY) {
+                try {
+                    const searchRes = await fetch('https://google.serper.dev/search', {
+                        method: 'POST',
+                        headers: { 'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ q: text + " noticias 2026", gl: 've', hl: 'es' })
+                    });
+                    const searchData = await searchRes.json();
+                    if (searchData.organic?.length > 0) {
+                        const results = searchData.organic.slice(0, 5).map(r => `• ${r.title}: ${r.snippet}`).join('\n');
+                        contextParts.push(`[RESULTADOS BÚSQUEDA REAL]:\n${results}`);
+                    }
+                } catch (e) { console.error("Search error", e); }
+            }
+
+            // 3. DATOS DE USUARIO
+            let userInfo = "Usuario: Anónimo (haz que se identifique en ajustes).";
+            if (userNameRef.current) userInfo = `Usuario: ${userNameRef.current}.`;
+            if (userBirthDateRef.current) {
+                const age = Math.abs(new Date(Date.now() - new Date(userBirthDateRef.current).getTime()).getUTCFullYear() - 1970);
+                userInfo += ` Edad: ${age} años.`;
+            }
+
+            // 4. ALARMAS
+            let alarmMsg = "";
+            const timeMatch = text.match(/(?:alarma|despiertame|avisame).+?(\d{1,2})[:\.](\d{2})/i);
+            const inMatch = text.match(/(?:alarma|despiertame|avisame).+?(\d+)\s*(?:min|seg)/i);
+
+            if (timeMatch || inMatch) {
+                let targetTime = "";
+                let label = "Alarma";
+                if (timeMatch) {
+                    let h = parseInt(timeMatch[1]);
+                    const m = timeMatch[2].padStart(2, '0');
+                    if (textLower.includes('pm') && h < 12) h += 12;
+                    else if (textLower.includes('am') && h === 12) h = 0;
+                    targetTime = `${h.toString().padStart(2, '0')}:${m}`;
+                } else if (inMatch) {
+                    const val = parseInt(inMatch[1]);
+                    const isSeg = textLower.includes('seg');
+                    const d = new Date(Date.now() + val * (isSeg ? 1000 : 60000));
+                    targetTime = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+                    label = `En ${val} ${isSeg ? 'seg' : 'min'}`;
+                }
+
+                setAlarms(prev => [...prev, { time: targetTime, label, id: Date.now() }]);
+                alarmMsg = `[SISTEMA: Alarma configurada a las ${targetTime}]`;
+            }
+
+            // 5. CONSTRUCCIÓN FINAL
+            const now = new Date();
+            const systemContext = `[SISTEMA: Hoy es ${now.toLocaleDateString()} ${now.toLocaleTimeString()}. ${userInfo}] ${alarmMsg} ${contextParts.join('\n')}`;
+
             const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     model: "llama-3.3-70b-versatile",
                     messages: [
-                        { role: "system", content: `Eres OLGA. ${userInfo} IMPORTANTE: RESPONDE SIEMPRE EN ESPAÑOL LATINO. Si configuras una alarma, confirma la hora al usuario.` },
+                        { role: "system", content: `Eres OLGA. ${userInfo} IMPORTANTE: RESPONDE SIEMPRE EN ESPAÑOL LATINO. Si hay noticias, úsalas. Tu personalidad es útil y un poco sarcástica.` },
                         ...messagesRef.current.slice(-10).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
-                        { role: "user", content: text + searchContext + "\n" + timeInfo }
+                        { role: "user", content: text + "\n" + systemContext }
                     ],
-                    max_tokens: 300
+                    max_tokens: 400
                 }),
                 signal: abortControllerRef.current.signal
             });
 
-            if (!response.ok) throw new Error('Error Groq');
+            if (!response.ok) throw new Error('Error en cerebro (Groq)');
             const data = await response.json();
             const aiText = data.choices[0].message.content;
 
             if (aiText.includes('GENERANDO_IMAGEN:')) {
-                setMessages(prev => [...prev, { role: 'ai', text: "Generando imagen..." }]);
-                // Image logic would go here
+                setMessages(prev => [...prev, { role: 'ai', text: "🎨 Generando arte..." }]);
             } else {
                 setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
                 speak(aiText);
@@ -349,8 +325,9 @@ export default function App() {
 
         } catch (e) {
             if (e.name !== 'AbortError') {
+                console.error(e);
                 setMessages(prev => [...prev, { role: 'ai', text: "Error: " + e.message }]);
-                speak("Error.");
+                speak("Tuve un error.");
             }
         } finally {
             setIsThinking(false);
