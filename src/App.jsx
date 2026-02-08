@@ -234,7 +234,7 @@ export default function App() {
 
             <button
                 style={{
-                    position: 'absolute', top: '55px', right: '20px', // BAJADO PARA EVITAR NOTCH
+                    position: 'absolute', top: '90px', right: '20px', // MUCHO MÁS ABAJO
                     background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%',
                     width: '50px', height: '50px', cursor: 'pointer', fontSize: '1.8rem',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000,
