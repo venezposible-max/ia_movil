@@ -101,6 +101,16 @@ export default function App() {
             });
 
             const data = await response.json();
+
+            if (!response.ok) {
+                const errMsg = data.error?.message || `Error API: ${response.status}`;
+                throw new Error(errMsg);
+            }
+
+            if (!data.choices || !data.choices[0]) {
+                throw new Error("No entendí lo que vi.");
+            }
+
             const description = data.choices[0].message.content;
 
             // 3. RESPONDEMOS
