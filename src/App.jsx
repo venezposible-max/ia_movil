@@ -79,9 +79,8 @@ export default function App() {
                 });
                 const searchData = await searchRes.json();
                 if (searchData.organic && searchData.organic.length > 0) {
-                    // USO CONCATENACIÓN SIMPLE PARA EVITAR ERRORES DE PARSEO
-                    const snippets = searchData.organic.slice(0, 3).map(r => 'Title: ' + r.title + '\nSnippet: ' + r.snippet).join('\n\n');
-                    searchContext = '\n\n[CONTEXTO DE BÚSQUEDA]:\n' + snippets + '\n\nUsa esto.';
+                    // SIMPLIFICADO AL MAXIMO PARA DEBUG
+                    searchContext = '\n\n[INFO]: Hay resultados de búsqueda, pero los he ocultado temporalmente por error de build.';
                 }
             } catch (e) {
                 console.error("Error buscar:", e);
