@@ -129,8 +129,8 @@ export default function App() {
                         INSTRUCCIONES:
                         1. Mantén el hilo.
                         2. Si preguntan la HORA: Dí SOLO la hora. 
-                        3. USUARIO: ${userName || 'Anónimo'}. (Cumpleaños: ${userBirthDate || 'Desconocido'})
-                        4. GENERAR IMAGEN: Si piden imagen, responde SOLO con: "GENERANDO_IMAGEN: [Prompt en ingles]"` },
+                        3. USUARIO: ${userName || 'Anónimo'}. (Cumpleaños: ${userBirthDate || 'Desconocido'})`
+                        },
                         ...currentHistory.slice(-15).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
                         { role: "user", content: text + searchContext }
                     ],
@@ -228,11 +228,11 @@ export default function App() {
 
             <button
                 style={{
-                    position: 'absolute', top: '20px', right: '20px',
-                    background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
-                    width: '40px', height: '40px', cursor: 'pointer', fontSize: '1.2rem',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10,
-                    color: '#fff'
+                    position: 'absolute', top: '55px', right: '20px', // BAJADO PARA EVITAR NOTCH
+                    background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%',
+                    width: '50px', height: '50px', cursor: 'pointer', fontSize: '1.8rem',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000,
+                    color: '#fff', backdropFilter: 'blur(10px)', boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
                 }}
                 title="Configuración"
                 onClick={() => setShowSettings(true)}
@@ -300,9 +300,9 @@ export default function App() {
                 {showSettings && (
                     <div style={{
                         position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-                        background: 'rgba(0,0,0,0.85)', zIndex: 100,
+                        background: 'rgba(0,0,0,0.92)', zIndex: 99999, // ENCIMA DE TODO
                         display: 'flex', justifyContent: 'center', alignItems: 'center',
-                        backdropFilter: 'blur(8px)'
+                        backdropFilter: 'blur(15px)'
                     }}>
                         <div style={{
                             background: '#1a1a2e', padding: '25px', borderRadius: '25px',
