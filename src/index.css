@@ -28,6 +28,8 @@ body {
     /* Evita rebote iOS */
     touch-action: manipulation;
     /* Mejora respuesta táctil */
+    display: flex;
+    justify-content: center;
     font-family: 'Space Grotesk', sans-serif;
     background-color: #050510;
     color: #fff;
