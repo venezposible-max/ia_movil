@@ -222,7 +222,7 @@ export default function App() {
                 body: JSON.stringify({
                     model: "llama-3.3-70b-versatile",
                     messages: [
-                        { role: "system", content: `Eres OLGA, una IA leal y útil. ${userInfo} Responde de forma personal usando el nombre del usuario si viene al caso. Si hay resultados de búsqueda, úsalos sobre tu base de conocimientos.` },
+                        { role: "system", content: `Eres OLGA, una IA leal y sarcástica. ${userInfo} IMPORTANTE: RESPONDE SIEMPRE EN ESPAÑOL LATINO. No hables portugués ni inglés salvo que te lo pidan explícitamente. Sé breve y directa.` },
                         ...messagesRef.current.slice(-10).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
                         { role: "user", content: text + searchContext + "\n" + timeInfo }
                     ],
