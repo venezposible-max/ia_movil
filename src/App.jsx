@@ -301,10 +301,10 @@ export default function App() {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    model: "llama-3.3-70b-versatile",
+                    model: "llama3-70b-8192", // Modelo más estable
                     messages: [
-                        { role: "system", content: `Eres OLGA. ${userInfo} IMPORTANTE: RESPONDE SIEMPRE EN ESPAÑOL LATINO. Si hay noticias, úsalas. Tu personalidad es útil y un poco sarcástica.` },
-                        ...messagesRef.current.slice(-10).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
+                        { role: "system", content: `Eres OLGA, asistente virtual en español. ${userInfo} IMPORTANTE: ERES ÚTIL Y BREVE. Si hay alarmas o noticias, confírmalo.` },
+                        ...messagesRef.current.slice(-6).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })), // Reducimos contexto a 6 para evitar overflow
                         { role: "user", content: text + "\n" + systemContext }
                     ],
                     max_tokens: 400
@@ -312,7 +312,11 @@ export default function App() {
                 signal: abortControllerRef.current.signal
             });
 
-            if (!response.ok) throw new Error('Error en cerebro (Groq)');
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({ error: { message: response.statusText } }));
+                throw new Error(errData.error?.message || `Error Groq: ${response.status}`);
+            }
+
             const data = await response.json();
             const aiText = data.choices[0].message.content;
 
