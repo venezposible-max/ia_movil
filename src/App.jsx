@@ -50,6 +50,14 @@ export default function App() {
     const recognitionRef = useRef(null);
     const synthRef = useRef(window.speechSynthesis);
     const abortControllerRef = useRef(null);
+    const visualMemoryRef = useRef(''); // MEMORIA VISUAL
+    const videoRef = useRef(null);
+    const canvasRef = useRef(null);
+
+    // Sincronizar refs
+    useEffect(() => { messagesRef.current = messages; }, [messages]);
+    useEffect(() => { userNameRef.current = userName; }, [userName]);
+    useEffect(() => { userBirthDateRef.current = userBirthDate; }, [userBirthDate]);
 
     // ALARMAS
     const [alarms, setAlarms] = useState([]);
@@ -99,8 +107,7 @@ export default function App() {
     // CÁMARA & IMAGEN
     const [showCamera, setShowCamera] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const videoRef = useRef(null);
-    const canvasRef = useRef(null);
+    // videoRef y canvasRef movidos arriba
     const [generatedImage, setGeneratedImage] = useState(null);
     const [imageLoading, setImageLoading] = useState(false);
 
@@ -166,491 +173,506 @@ export default function App() {
             recognitionRef.current = recognition;
         } else {
             setError('Navegador no compatible. Usa Chrome.');
-        }
-    }, []);
-
-    // --- CÁMARA ---
-    const startCamera = async () => {
-        try {
-            setShowCamera(true);
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-            if (videoRef.current) { videoRef.current.srcObject = stream; }
-        } catch (err) {
-            setError('Error Cámara: ' + err.message);
-            setShowCamera(false);
-        }
-    };
-
-    const stopCamera = () => {
-        if (videoRef.current && videoRef.current.srcObject) {
-            videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-            videoRef.current.srcObject = null;
-        }
-        setShowCamera(false);
-    };
-
-    const analyzeImage = async () => {
-        if (!videoRef.current || !canvasRef.current) return;
-        setIsAnalyzing(true);
-        speak("Déjame ver...");
-
-        const context = canvasRef.current.getContext('2d');
-        const MAX_WIDTH = 512;
-        let width = videoRef.current.videoWidth;
-        let height = videoRef.current.videoHeight;
-        if (width > MAX_WIDTH) { const s = MAX_WIDTH / width; width = MAX_WIDTH; height = height * s; }
-
-        canvasRef.current.width = width; canvasRef.current.height = height;
-        context.drawImage(videoRef.current, 0, 0, width, height);
-        const imageBase64 = canvasRef.current.toDataURL('image/jpeg', 0.6);
-
-        try {
-            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    model: "meta-llama/llama-4-scout-17b-16e-instruct", // VISION MODEL 2026
-                    messages: [
-                        { role: "user", content: [{ type: "text", text: `Describe BREVEMENTE qué ves. Eres OLGA.` }, { type: "image_url", image_url: { url: imageBase64 } }] }
-                    ],
-                    max_tokens: 150
-                })
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error?.message || 'Error API Vision');
-            const description = data.choices[0].message.content;
-
-            setMessages(prev => [...prev, { role: 'ai', text: "[👁️ VEO]: " + description }]);
-            speak(description);
-        } catch (e) {
-            console.error(e);
-            speak("No pude ver bien.");
-            alert("Error Visión: " + e.message);
-        } finally {
-            setIsAnalyzing(false);
-        }
-    };
-
-    // --- CORE LOGIC ---
-    const SERPER_API_KEY = (typeof __SERPER_KEY__ !== 'undefined' ? __SERPER_KEY__ : '') || import.meta.env.VITE_SERPER_API_KEY || '';
-
-    const handleUserMessage = async (text) => {
-        setMessages(prev => [...prev, { role: 'user', text }]);
-        setIsThinking(true);
-        if (abortControllerRef.current) abortControllerRef.current.abort();
-        abortControllerRef.current = new AbortController();
-
-        try {
-            let contextParts = [];
-            const textLower = text.toLowerCase();
-
-            // 1. CRIPTO CHECK
-            const cryptoMap = { 'bitcoin': 'BTCUSDT', 'btc': 'BTCUSDT', 'ethereum': 'ETHUSDT', 'eth': 'ETHUSDT', 'solana': 'SOLUSDT' };
-            let cryptoSymbol = null;
-            for (const [key, val] of Object.entries(cryptoMap)) { if (textLower.includes(key)) { cryptoSymbol = val; break; } }
-            if (cryptoSymbol) {
+            // --- CÁMARA ---
+            const startCamera = async () => {
                 try {
-                    const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${cryptoSymbol}`);
-                    const data = await res.json();
-                    if (data.price) contextParts.push(`[PRECIO ${cryptoSymbol}: $${parseFloat(data.price).toFixed(2)}]`);
-                } catch (e) { }
-            }
-
-            // 2. NOTICIAS (POLÍTICA Y ACTUALIDAD)
-            const newsTriggers = ['precio', 'noticia', 'última hora', 'pasó', 'actualidad', 'falleció', 'ganó', 'sismo', 'maduro', 'corina', 'venezuela', 'trump', 'biden', 'dónde está', 'donde esta', 'preso', 'situación'];
-            if (newsTriggers.some(kw => textLower.includes(kw)) && SERPER_API_KEY) {
-                try {
-                    const searchRes = await fetch('https://google.serper.dev/search', {
-                        method: 'POST',
-                        headers: { 'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ q: text + " noticias 2026", gl: 've', hl: 'es' })
-                    });
-                    const searchData = await searchRes.json();
-                    if (searchData.organic?.length > 0) {
-                        const results = searchData.organic.slice(0, 5).map(r => `• ${r.title}: ${r.snippet}`).join('\n');
-                        contextParts.push(`[RESULTADOS BÚSQUEDA REAL]:\n${results}`);
-                    }
-                } catch (e) { console.error("Search error", e); }
-            }
-
-            // 3. DATOS DE USUARIO
-            let userInfo = "Usuario: Anónimo (haz que se identifique en ajustes).";
-            if (userNameRef.current) userInfo = `Usuario: ${userNameRef.current}.`;
-            if (userBirthDateRef.current) {
-                const age = Math.abs(new Date(Date.now() - new Date(userBirthDateRef.current).getTime()).getUTCFullYear() - 1970);
-                userInfo += ` Edad: ${age} años.`;
-            }
-
-            // 4. SISTEMA DE ALARMAS
-            let alarmMsg = "";
-            const alarmTimeRegex = /(?:alarma|despiertame|avisame).+?(\d{1,2})[:\.](\d{2})/i;
-            const alarmInRegex = /(?:alarma|despiertame|avisame).+?(\d+)\s*(?:min|seg)/i;
-
-            const timeMatch = text.match(alarmTimeRegex);
-            const inMatch = text.match(alarmInRegex);
-
-            if (timeMatch || inMatch) {
-                let targetTime = "";
-                let label = "Alarma";
-                if (timeMatch) {
-                    let h = parseInt(timeMatch[1]);
-                    const m = timeMatch[2].padStart(2, '0');
-                    if (textLower.includes('pm') && h < 12) h += 12;
-                    else if (textLower.includes('am') && h === 12) h = 0;
-                    targetTime = `${h.toString().padStart(2, '0')}:${m}`;
-                } else if (inMatch) {
-                    const val = parseInt(inMatch[1]);
-                    const isSeg = textLower.includes('seg');
-                    const d = new Date(Date.now() + val * (isSeg ? 1000 : 60000));
-                    targetTime = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-                    label = `En ${val} ${isSeg ? 'seg' : 'min'}`;
+                    setShowCamera(true);
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                    if (videoRef.current) { videoRef.current.srcObject = stream; }
+                } catch (err) {
+                    setError('Error Cámara: ' + err.message);
+                    setShowCamera(false);
                 }
+            };
 
-                setAlarms(prev => [...prev, { time: targetTime, label, id: Date.now() }]);
-                alarmMsg = `[SISTEMA: Alarma configurada a las ${targetTime}]`;
-            }
+            const stopCamera = () => {
+                if (videoRef.current && videoRef.current.srcObject) {
+                    videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+                    videoRef.current.srcObject = null;
+                }
+                setShowCamera(false);
+            };
 
-            // 5. MODULO TAROT (LA BRUJA DIGITAL)
-            const tarotTriggers = ['tarot', 'cartas', 'futuro', 'destino', 'suerte', 'amor', 'lectura'];
-            let mysticism = "";
-            if (tarotTriggers.some(t => textLower.includes(t)) && (textLower.includes('lee') || textLower.includes('tira') || textLower.includes('dime') || textLower.includes('saber') || textLower.includes('mi'))) {
-                mysticism = `[MODO MÍSTICO ACTIVADO: El usuario pide TAROT. 
-                1. "Saca" 3 cartas aleatorias de los Arcanos Mayores.
-                2. Muestralas con emojis (ej: 🃏 LA TORRE).
-                3. Interpreta Pasado, Presente, Futuro relacionado con su pregunta.
-                4. Mantén tu personalidad de IA pero en plan "Oráculo Cyberpunk".]`;
-            }
+            const analyzeImage = async () => {
+                if (!videoRef.current || !canvasRef.current) return;
+                setIsAnalyzing(true);
+                speak("Déjame ver...");
 
-            // 6. CONSTRUCCIÓN FINAL
-            const now = new Date();
-            const systemContext = `[SISTEMA: Hoy es ${now.toLocaleDateString()} ${now.toLocaleTimeString()}. ${userInfo}] ${alarmMsg} ${contextParts.join('\n')} ${mysticism}`;
+                const context = canvasRef.current.getContext('2d');
+                const MAX_WIDTH = 512;
+                let width = videoRef.current.videoWidth;
+                let height = videoRef.current.videoHeight;
+                if (width > MAX_WIDTH) { const s = MAX_WIDTH / width; width = MAX_WIDTH; height = height * s; }
 
-            // 7. CEREBRO ROBUSTO (ROTACIÓN DE MODELOS) - SISTEMA ANTI-CAÍDAS
-            const MODELS = [
-                "llama-3.1-8b-instant",    // 1. Prioridad: Velocidad
-                "llama-3.3-70b-versatile", // 2. Calidad
-                "gemma2-9b-it",            // 3. Respaldo Google
-                "mixtral-8x7b-32768"       // 4. Respaldo Mixtral
-            ];
+                canvasRef.current.width = width; canvasRef.current.height = height;
+                context.drawImage(videoRef.current, 0, 0, width, height);
+                const imageBase64 = canvasRef.current.toDataURL('image/jpeg', 0.6);
 
-            let aiText = "";
-            let lastError = null;
-
-            for (const modelId of MODELS) {
                 try {
                     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                         method: 'POST',
                         headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            model: modelId,
+                            model: "llama-3.2-11b-vision-preview", // MODELO DE VISION ESPECÍFICO
                             messages: [
-                                { role: "system", content: `Eres OLGA, asistente virtual en español. ${userInfo} [MODELO ACTIVO: ${modelId}] IMPORTANTE: ERES ÚTIL Y BREVE. Responde siempre en Español.` },
-                                ...messagesRef.current.slice(-6).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
-                                { role: "user", content: text + "\n" + systemContext }
+                                {
+                                    role: "user", content: [
+                                        { type: "text", text: "Describe DETALLADAMENTE qué ves en esta imagen. Sé precisa." },
+                                        { type: "image_url", image_url: { url: imageBase64 } }
+                                    ]
+                                }
                             ],
-                            max_tokens: 1200 // AUMENTADO PARA EVITAR CORTES
-                        }),
-                        signal: abortControllerRef.current.signal
+                            max_tokens: 300
+                        })
                     });
 
-                    if (!response.ok) {
-                        const errData = await response.json().catch(() => ({}));
-                        throw new Error(errData.error?.message || `Status ${response.status}`);
+                    if (!response.ok) throw new Error('Error Vision API');
+                    const data = await response.json();
+                    const description = data.choices[0].message.content;
+
+                    // GUARDAR EN MEMORIA PERSISTENTE
+                    visualMemoryRef.current = description;
+
+                    setMessages(prev => [...prev, { role: 'ai', text: "[👁️ VEO]: " + description }]);
+                    speak(description);
+
+                    // Opcional: Cerrar cámara automáticamente tras analizar
+                    // stopCamera(); 
+                } catch (e) {
+                    console.error(e);
+                    speak("No pude ver bien.");
+                } finally {
+                    setIsAnalyzing(false);
+                }
+            };
+
+            // --- CORE LOGIC ---
+            const SERPER_API_KEY = (typeof __SERPER_KEY__ !== 'undefined' ? __SERPER_KEY__ : '') || import.meta.env.VITE_SERPER_API_KEY || '';
+
+            const handleUserMessage = async (text) => {
+                setMessages(prev => [...prev, { role: 'user', text }]);
+                setIsThinking(true);
+                if (abortControllerRef.current) abortControllerRef.current.abort();
+                abortControllerRef.current = new AbortController();
+
+                try {
+                    let contextParts = [];
+                    const textLower = text.toLowerCase();
+
+                    // 1. CRIPTO CHECK
+                    const cryptoMap = { 'bitcoin': 'BTCUSDT', 'btc': 'BTCUSDT', 'ethereum': 'ETHUSDT', 'eth': 'ETHUSDT', 'solana': 'SOLUSDT' };
+                    let cryptoSymbol = null;
+                    for (const [key, val] of Object.entries(cryptoMap)) { if (textLower.includes(key)) { cryptoSymbol = val; break; } }
+                    if (cryptoSymbol) {
+                        try {
+                            const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${cryptoSymbol}`);
+                            const data = await res.json();
+                            if (data.price) contextParts.push(`[PRECIO ${cryptoSymbol}: $${parseFloat(data.price).toFixed(2)}]`);
+                        } catch (e) { }
                     }
 
-                    const data = await response.json();
-                    aiText = data.choices[0].message.content;
+                    // 2. NOTICIAS (POLÍTICA Y ACTUALIDAD)
+                    const newsTriggers = ['precio', 'noticia', 'última hora', 'pasó', 'actualidad', 'falleció', 'ganó', 'sismo', 'maduro', 'corina', 'venezuela', 'trump', 'biden', 'dónde está', 'donde esta', 'preso', 'situación'];
+                    if (newsTriggers.some(kw => textLower.includes(kw)) && SERPER_API_KEY) {
+                        try {
+                            const searchRes = await fetch('https://google.serper.dev/search', {
+                                method: 'POST',
+                                headers: { 'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ q: text + " noticias 2026", gl: 've', hl: 'es' })
+                            });
+                            const searchData = await searchRes.json();
+                            if (searchData.organic?.length > 0) {
+                                const results = searchData.organic.slice(0, 5).map(r => `• ${r.title}: ${r.snippet}`).join('\n');
+                                contextParts.push(`[RESULTADOS BÚSQUEDA REAL]:\n${results}`);
+                            }
+                        } catch (e) { console.error("Search error", e); }
+                    }
 
-                    // TRACKING TOKENS
-                    const inputTokens = Math.ceil((text.length + systemContext.length) / 4);
-                    const outputTokens = Math.ceil(aiText.length / 4);
-                    setDailyTokens(prev => prev + inputTokens + outputTokens);
+                    // 3. DATOS DE USUARIO
+                    let userInfo = "Usuario: Anónimo (haz que se identifique en ajustes).";
+                    if (userNameRef.current) userInfo = `Usuario: ${userNameRef.current}.`;
+                    if (userBirthDateRef.current) {
+                        const age = Math.abs(new Date(Date.now() - new Date(userBirthDateRef.current).getTime()).getUTCFullYear() - 1970);
+                        userInfo += ` Edad: ${age} años.`;
+                    }
 
-                    break; // ¡Éxito!  
+                    // 4. SISTEMA DE ALARMAS
+                    let alarmMsg = "";
+                    const alarmTimeRegex = /(?:alarma|despiertame|avisame).+?(\d{1,2})[:\.](\d{2})/i;
+                    const alarmInRegex = /(?:alarma|despiertame|avisame).+?(\d+)\s*(?:min|seg)/i;
+
+                    const timeMatch = text.match(alarmTimeRegex);
+                    const inMatch = text.match(alarmInRegex);
+
+                    if (timeMatch || inMatch) {
+                        let targetTime = "";
+                        let label = "Alarma";
+                        if (timeMatch) {
+                            let h = parseInt(timeMatch[1]);
+                            const m = timeMatch[2].padStart(2, '0');
+                            if (textLower.includes('pm') && h < 12) h += 12;
+                            else if (textLower.includes('am') && h === 12) h = 0;
+                            targetTime = `${h.toString().padStart(2, '0')}:${m}`;
+                        } else if (inMatch) {
+                            const val = parseInt(inMatch[1]);
+                            const isSeg = textLower.includes('seg');
+                            const d = new Date(Date.now() + val * (isSeg ? 1000 : 60000));
+                            targetTime = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+                            label = `En ${val} ${isSeg ? 'seg' : 'min'}`;
+                        }
+
+                        setAlarms(prev => [...prev, { time: targetTime, label, id: Date.now() }]);
+                        alarmMsg = `[SISTEMA: Alarma configurada a las ${targetTime}]`;
+                    }
+
+                    // 5. MODULO TAROT (LA BRUJA DIGITAL)
+                    const tarotTriggers = ['tarot', 'cartas', 'futuro', 'destino', 'suerte', 'amor', 'lectura'];
+                    let mysticism = "";
+                    if (tarotTriggers.some(t => textLower.includes(t)) && (textLower.includes('lee') || textLower.includes('tira') || textLower.includes('dime') || textLower.includes('saber') || textLower.includes('mi'))) {
+                        mysticism = `[MODO MÍSTICO ACTIVADO: El usuario pide TAROT. 
+                1. "Saca" 3 cartas aleatorias de los Arcanos Mayores.
+                2. Muestralas con emojis (ej: 🃏 LA TORRE).
+                3. Interpreta Pasado, Presente, Futuro relacionado con su pregunta.
+                4. Mantén tu personalidad de IA pero en plan "Oráculo Cyberpunk".]`;
+                    }
+
+                    // 6. MEMORIA VISUAL (LO QUE VIO LA CÁMARA)
+                    let visualContext = "";
+                    if (visualMemoryRef.current) {
+                        visualContext = ` [MEMORIA VISUAL (IMPORTANTE): Hace un momento viste esto con tu cámara: "${visualMemoryRef.current}". Si el usuario pregunta "qué viste", usa esta información.] `;
+                    }
+
+                    // 7. CONSTRUCCIÓN FINAL
+                    const now = new Date();
+                    const systemContext = `[SISTEMA: Hoy es ${now.toLocaleDateString()} ${now.toLocaleTimeString()}. ${userInfo}] ${alarmMsg} ${contextParts.join('\n')} ${mysticism} ${visualContext}`;
+
+                    // 8. CEREBRO ROBUSTO (ROTACIÓN DE MODELOS) - SISTEMA ANTI-CAÍDAS
+                    const MODELS = [
+                        "llama-3.1-8b-instant",    // 1. Prioridad: Velocidad
+                        "llama-3.3-70b-versatile", // 2. Calidad
+                        "gemma2-9b-it",            // 3. Respaldo Google
+                        "mixtral-8x7b-32768"       // 4. Respaldo Mixtral
+                    ];
+
+                    let aiText = "";
+                    let lastError = null;
+
+                    for (const modelId of MODELS) {
+                        try {
+                            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    model: modelId,
+                                    messages: [
+                                        { role: "system", content: `Eres OLGA, asistente virtual en español. ${userInfo} [MODELO ACTIVO: ${modelId}] IMPORTANTE: ERES ÚTIL Y BREVE. Responde siempre en Español.` },
+                                        ...messagesRef.current.slice(-6).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
+                                        { role: "user", content: text + "\n" + systemContext }
+                                    ],
+                                    max_tokens: 1200 // AUMENTADO PARA EVITAR CORTES
+                                }),
+                                signal: abortControllerRef.current.signal
+                            });
+
+                            if (!response.ok) {
+                                const errData = await response.json().catch(() => ({}));
+                                throw new Error(errData.error?.message || `Status ${response.status}`);
+                            }
+
+                            const data = await response.json();
+                            aiText = data.choices[0].message.content;
+
+                            // TRACKING TOKENS
+                            const inputTokens = Math.ceil((text.length + systemContext.length) / 4);
+                            const outputTokens = Math.ceil(aiText.length / 4);
+                            setDailyTokens(prev => prev + inputTokens + outputTokens);
+
+                            break; // ¡Éxito!  
+                        } catch (e) {
+                            console.warn(`⚠️ Falló ${modelId}:`, e.message);
+                            lastError = e;
+                            if (e.name === 'AbortError') throw e;
+                        }
+                    }
+
+                    if (!aiText) throw new Error(`Todos los cerebros fallaron. Último: ${lastError?.message}`);
+
+                    if (aiText.includes('GENERANDO_IMAGEN:')) {
+                        setMessages(prev => [...prev, { role: 'ai', text: "🎨 Generando arte..." }]);
+                    } else {
+                        setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
+                        speak(aiText);
+                    }
+
                 } catch (e) {
-                    console.warn(`⚠️ Falló ${modelId}:`, e.message);
-                    lastError = e;
-                    if (e.name === 'AbortError') throw e;
+                    if (e.name !== 'AbortError') {
+                        console.error(e);
+                        setMessages(prev => [...prev, { role: 'ai', text: "Error: " + e.message }]);
+                        speak("Tuve un error.");
+                    }
+                } finally {
+                    setIsThinking(false);
                 }
-            }
+            };
 
-            if (!aiText) throw new Error(`Todos los cerebros fallaron. Último: ${lastError?.message}`);
+            const speak = (text, forceVoiceName = null) => {
+                if (synthRef.current.speaking) synthRef.current.cancel();
 
-            if (aiText.includes('GENERANDO_IMAGEN:')) {
-                setMessages(prev => [...prev, { role: 'ai', text: "🎨 Generando arte..." }]);
-            } else {
-                setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
-                speak(aiText);
-            }
+                const cleanText = text.replace(/[*#]/g, '').replace(/(\d)\.(\d{3})(?!\d)/g, '$1$2');
+                const utterance = new SpeechSynthesisUtterance(cleanText);
 
-        } catch (e) {
-            if (e.name !== 'AbortError') {
-                console.error(e);
-                setMessages(prev => [...prev, { role: 'ai', text: "Error: " + e.message }]);
-                speak("Tuve un error.");
-            }
-        } finally {
-            setIsThinking(false);
-        }
-    };
+                // 1. VOZ (Usuario o Auto)
+                const targetName = forceVoiceName || selectedVoiceName;
+                const allVoices = window.speechSynthesis.getVoices();
+                let selectedVoice = null;
 
-    const speak = (text, forceVoiceName = null) => {
-        if (synthRef.current.speaking) synthRef.current.cancel();
+                if (targetName) {
+                    selectedVoice = allVoices.find(v => v.name === targetName);
+                }
 
-        const cleanText = text.replace(/[*#]/g, '').replace(/(\d)\.(\d{3})(?!\d)/g, '$1$2');
-        const utterance = new SpeechSynthesisUtterance(cleanText);
+                if (!selectedVoice) {
+                    // ALERTA ANTI-PORTUGUÉS: FILTRADO ESTRICTO
+                    const cleanVoices = allVoices.filter(v =>
+                        v.lang.toLowerCase().startsWith('es') &&
+                        !v.name.toLowerCase().includes('portu') &&
+                        !v.name.toLowerCase().includes('brazil') &&
+                        !v.name.toLowerCase().includes('br') &&
+                        !v.lang.toLowerCase().includes('pt')
+                    );
 
-        // 1. VOZ (Usuario o Auto)
-        const targetName = forceVoiceName || selectedVoiceName;
-        const allVoices = window.speechSynthesis.getVoices();
-        let selectedVoice = null;
+                    // BUSQUEDA PRIORITARIA LATINA
+                    selectedVoice = cleanVoices.find(v => v.name.includes('Paulina')) ||
+                        cleanVoices.find(v => v.name.includes('Sabina')) ||
+                        cleanVoices.find(v => v.name.includes('Mexico')) ||
+                        cleanVoices.find(v => v.name.includes('Google español de Estados Unidos')) ||
+                        cleanVoices.find(v => v.lang === 'es-MX') ||
+                        cleanVoices.find(v => v.lang === 'es-US') ||
+                        cleanVoices.find(v => v.lang === 'es-419') ||
+                        cleanVoices[0];
+                }
 
-        if (targetName) {
-            selectedVoice = allVoices.find(v => v.name === targetName);
-        }
+                if (selectedVoice) {
+                    utterance.voice = selectedVoice;
+                    utterance.lang = selectedVoice.lang;
+                } else {
+                    utterance.lang = 'es-MX';
+                }
 
-        if (!selectedVoice) {
-            // ALERTA ANTI-PORTUGUÉS: FILTRADO ESTRICTO
-            const cleanVoices = allVoices.filter(v =>
-                v.lang.toLowerCase().startsWith('es') &&
-                !v.name.toLowerCase().includes('portu') &&
-                !v.name.toLowerCase().includes('brazil') &&
-                !v.name.toLowerCase().includes('br') &&
-                !v.lang.toLowerCase().includes('pt')
-            );
+                utterance.pitch = 1.05;
+                utterance.rate = 1.15;
 
-            // BUSQUEDA PRIORITARIA LATINA
-            selectedVoice = cleanVoices.find(v => v.name.includes('Paulina')) ||
-                cleanVoices.find(v => v.name.includes('Sabina')) ||
-                cleanVoices.find(v => v.name.includes('Mexico')) ||
-                cleanVoices.find(v => v.name.includes('Google español de Estados Unidos')) ||
-                cleanVoices.find(v => v.lang === 'es-MX') ||
-                cleanVoices.find(v => v.lang === 'es-US') ||
-                cleanVoices.find(v => v.lang === 'es-419') ||
-                cleanVoices[0];
-        }
+                utterance.onstart = () => setIsSpeaking(true);
+                utterance.onend = () => setIsSpeaking(false);
+                utterance.onerror = () => setIsSpeaking(false);
 
-        if (selectedVoice) {
-            utterance.voice = selectedVoice;
-            utterance.lang = selectedVoice.lang;
-        } else {
-            utterance.lang = 'es-MX';
-        }
+                synthRef.current.speak(utterance);
+            };
 
-        utterance.pitch = 1.05;
-        utterance.rate = 1.15;
+            const toggleListening = () => {
+                if (isSpeaking) { synthRef.current.cancel(); setIsSpeaking(false); return; }
+                if (isThinking) return;
+                if (isListening) recognitionRef.current?.stop();
+                else {
+                    const wakeUp = new SpeechSynthesisUtterance(" ");
+                    wakeUp.volume = 0;
+                    synthRef.current.speak(wakeUp);
+                    setError('');
+                    recognitionRef.current?.start();
+                }
+            };
 
-        utterance.onstart = () => setIsSpeaking(true);
-        utterance.onend = () => setIsSpeaking(false);
-        utterance.onerror = () => setIsSpeaking(false);
+            // --- DISEÑO CLÁSICO (RESTORED) ---
+            return (
+                <div className='container'>
 
-        synthRef.current.speak(utterance);
-    };
-
-    const toggleListening = () => {
-        if (isSpeaking) { synthRef.current.cancel(); setIsSpeaking(false); return; }
-        if (isThinking) return;
-        if (isListening) recognitionRef.current?.stop();
-        else {
-            const wakeUp = new SpeechSynthesisUtterance(" ");
-            wakeUp.volume = 0;
-            synthRef.current.speak(wakeUp);
-            setError('');
-            recognitionRef.current?.start();
-        }
-    };
-
-    // --- DISEÑO CLÁSICO (RESTORED) ---
-    return (
-        <div className='container'>
-
-            {/* HEADER CLÁSICO */}
-            <div className='header'>
-                <h1>⚡ OLGA AI</h1>
-                <p>Neural Network • Llama 4 • Live Search</p>
-                <span style={{ fontSize: '0.7rem', color: API_KEY ? '#4caf50' : '#ff5555', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '10px' }}>
-                    {API_KEY ? '✅ Sistema Online' : `❌ Falta API Key (${API_KEY?.length || 0})`}
-                </span>
-            </div>
-
-            {/* BOTÓN CONFIG (ENGRANAJE) - POSICIÓN CORREGIDA */}
-            <button
-                onClick={() => setShowSettings(true)}
-                title="Configuración"
-                style={{
-                    position: 'absolute', top: 'calc(20px + env(safe-area-inset-top))', right: '20px',
-                    background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%',
-                    width: '50px', height: '50px', cursor: 'pointer', fontSize: '1.8rem',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000,
-                    color: '#fff', backdropFilter: 'blur(10px)', boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
-                }}
-            >
-                ⚙️
-            </button>
-
-            {/* BOTÓN VISIÓN (OJO) - POSICIÓN CORREGIDA */}
-            <button
-                onClick={startCamera}
-                title="Activar Visión"
-                style={{
-                    position: 'absolute', top: 'calc(20px + env(safe-area-inset-top))', left: '20px',
-                    background: 'rgba(0, 243, 255, 0.15)', border: '1px solid rgba(0, 243, 255, 0.3)', borderRadius: '50%',
-                    width: '50px', height: '50px', cursor: 'pointer', fontSize: '1.8rem',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000,
-                    color: '#00f3ff', backdropFilter: 'blur(10px)', boxShadow: '0 0 15px rgba(0, 243, 255, 0.2)'
-                }}
-            >
-                👁️
-            </button>
-
-            {/* CONTENIDO PRINCIPAL (ORBE) */}
-            <div className='main-content'>
-
-                {generatedImage && (
-                    <div style={{ marginBottom: '20px', padding: '5px', background: 'rgba(255,255,255,0.1)', borderRadius: '15px' }}>
-                        <img src={generatedImage} alt="Arte" style={{ width: '300px', borderRadius: '10px' }} />
+                    {/* HEADER CLÁSICO */}
+                    <div className='header'>
+                        <h1>⚡ OLGA AI</h1>
+                        <p>Neural Network • Llama 4 • Live Search</p>
+                        <span style={{ fontSize: '0.7rem', color: API_KEY ? '#4caf50' : '#ff5555', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '10px' }}>
+                            {API_KEY ? '✅ Sistema Online' : `❌ Falta API Key (${API_KEY?.length || 0})`}
+                        </span>
                     </div>
-                )}
 
-                <div className='orb-container'>
+                    {/* BOTÓN CONFIG (ENGRANAJE) - POSICIÓN CORREGIDA */}
                     <button
-                        className={`orb-button ${isListening ? 'listening' : ''} ${isThinking ? 'thinking' : ''} ${isSpeaking ? 'speaking' : ''}`}
-                        onClick={toggleListening}
+                        onClick={() => setShowSettings(true)}
+                        title="Configuración"
+                        style={{
+                            position: 'absolute', top: 'calc(20px + env(safe-area-inset-top))', right: '20px',
+                            background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%',
+                            width: '50px', height: '50px', cursor: 'pointer', fontSize: '1.8rem',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000,
+                            color: '#fff', backdropFilter: 'blur(10px)', boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
+                        }}
                     >
-                        {/* AVATAR REALISTA - SIEMPRE VISIBLE */}
-                        <img
-                            src="/avatar.png"
-                            className="avatar-img"
-                            alt="OLGA AI"
-                            onError={(e) => { e.target.style.display = 'none'; }} // Fallback invisible si no copian la imagen
-                        />
+                        ⚙️
+                    </button>
 
-                        {/* Fallback Icon si la imagen falla (opcional) */}
-                        <div className="icon-fallback" style={{ position: 'absolute', zIndex: -1 }}>
-                            <Bot size={64} color="#fff" />
+                    {/* BOTÓN VISIÓN (OJO) - POSICIÓN CORREGIDA */}
+                    <button
+                        onClick={startCamera}
+                        title="Activar Visión"
+                        style={{
+                            position: 'absolute', top: 'calc(20px + env(safe-area-inset-top))', left: '20px',
+                            background: 'rgba(0, 243, 255, 0.15)', border: '1px solid rgba(0, 243, 255, 0.3)', borderRadius: '50%',
+                            width: '50px', height: '50px', cursor: 'pointer', fontSize: '1.8rem',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000,
+                            color: '#00f3ff', backdropFilter: 'blur(10px)', boxShadow: '0 0 15px rgba(0, 243, 255, 0.2)'
+                        }}
+                    >
+                        👁️
+                    </button>
+
+                    {/* CONTENIDO PRINCIPAL (ORBE) */}
+                    <div className='main-content'>
+
+                        {generatedImage && (
+                            <div style={{ marginBottom: '20px', padding: '5px', background: 'rgba(255,255,255,0.1)', borderRadius: '15px' }}>
+                                <img src={generatedImage} alt="Arte" style={{ width: '300px', borderRadius: '10px' }} />
+                            </div>
+                        )}
+
+                        <div className='orb-container'>
+                            <button
+                                className={`orb-button ${isListening ? 'listening' : ''} ${isThinking ? 'thinking' : ''} ${isSpeaking ? 'speaking' : ''}`}
+                                onClick={toggleListening}
+                            >
+                                {/* AVATAR REALISTA - SIEMPRE VISIBLE */}
+                                <img
+                                    src="/avatar.png"
+                                    className="avatar-img"
+                                    alt="OLGA AI"
+                                    onError={(e) => { e.target.style.display = 'none'; }} // Fallback invisible si no copian la imagen
+                                />
+
+                                {/* Fallback Icon si la imagen falla (opcional) */}
+                                <div className="icon-fallback" style={{ position: 'absolute', zIndex: -1 }}>
+                                    <Bot size={64} color="#fff" />
+                                </div>
+                            </button>
+                            <div className='status-text'>
+                                {isThinking ? 'Procesando...' : isSpeaking ? 'Hablando...' : isListening ? 'Escuchando...' : 'TOCA PARA HABLAR'}
+                            </div>
                         </div>
-                    </button>
-                    <div className='status-text'>
-                        {isThinking ? 'Procesando...' : isSpeaking ? 'Hablando...' : isListening ? 'Escuchando...' : 'TOCA PARA HABLAR'}
+
+                        {error && <div className='error-msg'>⚠️ {error}</div>}
                     </div>
-                </div>
 
-                {error && <div className='error-msg'>⚠️ {error}</div>}
-            </div>
-
-            {/* CHAT LOG */}
-            <div className='chat-log'>
-                {messages.length === 0 && <div style={{ opacity: 0.5, textAlign: 'center', fontSize: '0.8rem' }}>Historial vacío</div>}
-                {messages.slice(-3).map((msg, idx) => (
-                    <div key={idx} className={`message ${msg.role}`}>
-                        <strong>{msg.role === 'ai' ? '🤖' : '👤'}:</strong> {msg.text}
+                    {/* CHAT LOG */}
+                    <div className='chat-log'>
+                        {messages.length === 0 && <div style={{ opacity: 0.5, textAlign: 'center', fontSize: '0.8rem' }}>Historial vacío</div>}
+                        {messages.slice(-3).map((msg, idx) => (
+                            <div key={idx} className={`message ${msg.role}`}>
+                                <strong>{msg.role === 'ai' ? '🤖' : '👤'}:</strong> {msg.text}
+                            </div>
+                        ))}
                     </div>
-                ))}
-            </div>
 
-            {/* CÁMARA UI - REPARADA (BOTONES ALTOS) */}
-            {showCamera && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, width: '100%', height: '100dvh', // 100dvh IMPORTANTE
-                    background: '#000', zIndex: 999999, display: 'flex', flexDirection: 'column'
-                }}>
-                    <video ref={videoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <canvas ref={canvasRef} style={{ display: 'none' }} />
-
-                    <button onClick={stopCamera} style={{
-                        position: 'absolute', bottom: 'calc(120px + env(safe-area-inset-bottom))', left: '20px',
-                        background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)',
-                        borderRadius: '30px', padding: '12px 24px', fontSize: '1rem', fontWeight: 'bold', zIndex: 100,
-                        backdropFilter: 'blur(5px)'
-                    }}>⬅️ Volver</button>
-
-                    <button onClick={analyzeImage} disabled={isAnalyzing} style={{
-                        position: 'absolute', bottom: 'calc(120px + env(safe-area-inset-bottom))',
-                        left: '50%', transform: 'translateX(-50%)',
-                        background: isAnalyzing ? '#555' : '#fff',
-                        color: '#000', border: '5px solid rgba(255,255,255,0.3)',
-                        borderRadius: '50%', width: '80px', height: '80px',
-                        fontSize: '2rem', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 0 20px rgba(255,255,255,0.5)'
-                    }}>
-                        {isAnalyzing ? '⏳' : '📸'}
-                    </button>
-
-                    {isAnalyzing && (
+                    {/* CÁMARA UI - REPARADA (BOTONES ALTOS) */}
+                    {showCamera && (
                         <div style={{
-                            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-                            color: '#00f3ff', fontSize: '1.5rem', fontWeight: 'bold', background: 'rgba(0,0,0,0.7)',
-                            padding: '10px 20px', borderRadius: '20px', zIndex: 101, pointerEvents: 'none'
-                        }}>🧠 Analizando...</div>
+                            position: 'fixed', top: 0, left: 0, width: '100%', height: '100dvh', // 100dvh IMPORTANTE
+                            background: '#000', zIndex: 999999, display: 'flex', flexDirection: 'column'
+                        }}>
+                            <video ref={videoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+                            <button onClick={stopCamera} style={{
+                                position: 'absolute', bottom: 'calc(120px + env(safe-area-inset-bottom))', left: '20px',
+                                background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)',
+                                borderRadius: '30px', padding: '12px 24px', fontSize: '1rem', fontWeight: 'bold', zIndex: 100,
+                                backdropFilter: 'blur(5px)'
+                            }}>⬅️ Volver</button>
+
+                            <button onClick={analyzeImage} disabled={isAnalyzing} style={{
+                                position: 'absolute', bottom: 'calc(120px + env(safe-area-inset-bottom))',
+                                left: '50%', transform: 'translateX(-50%)',
+                                background: isAnalyzing ? '#555' : '#fff',
+                                color: '#000', border: '5px solid rgba(255,255,255,0.3)',
+                                borderRadius: '50%', width: '80px', height: '80px',
+                                fontSize: '2rem', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                boxShadow: '0 0 20px rgba(255,255,255,0.5)'
+                            }}>
+                                {isAnalyzing ? '⏳' : '📸'}
+                            </button>
+
+                            {isAnalyzing && (
+                                <div style={{
+                                    position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                                    color: '#00f3ff', fontSize: '1.5rem', fontWeight: 'bold', background: 'rgba(0,0,0,0.7)',
+                                    padding: '10px 20px', borderRadius: '20px', zIndex: 101, pointerEvents: 'none'
+                                }}>🧠 Analizando...</div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* SETTINGS MODAL */}
+                    {showSettings && (
+                        <div style={{
+                            position: 'fixed', top: 0, left: 0, width: '100%', height: '100dvh',
+                            background: 'rgba(0,0,0,0.95)', zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center'
+                        }}>
+                            <div style={{ width: '85%', maxWidth: '350px', color: '#fff', textAlign: 'left', background: '#111', padding: '25px', borderRadius: '20px', border: '1px solid #333' }}>
+                                <h2 style={{ textAlign: 'center', margin: '0 0 20px 0', color: '#00f3ff' }}>⚙️ Ajustes</h2>
+
+                                <label style={{ display: 'block', marginBottom: '5px', color: '#aaa', fontSize: '0.9rem' }}>Voz de OLGA:</label>
+                                <select
+                                    value={selectedVoiceName}
+                                    onChange={(e) => {
+                                        setSelectedVoiceName(e.target.value);
+                                        localStorage.setItem('olga_voice_name', e.target.value);
+                                        speak("Soy OLGA.", e.target.value);
+                                    }}
+                                    style={{
+                                        width: '100%', padding: '12px', marginBottom: '20px',
+                                        borderRadius: '10px', background: '#222', color: '#fff', border: '1px solid #444',
+                                        fontSize: '0.9rem'
+                                    }}
+                                >
+                                    <option value="">-- Automática (Mejor) --</option>
+                                    {availableVoices.map(v => (
+                                        <option key={v.name} value={v.name}>
+                                            {v.name.replace('Microsoft ', '').replace('Google ', '').substring(0, 30)} ({v.lang})
+                                        </option>
+                                    ))}
+                                </select>
+
+                                <label style={{ display: 'block', marginBottom: '8px', color: '#aaa', fontSize: '0.9rem' }}>Tu Nombre:</label>
+                                <input
+                                    type="text"
+                                    value={userName}
+                                    onChange={e => setUserName(e.target.value)}
+                                    placeholder="Ej: Franklin"
+                                    style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '10px', border: 'none', background: '#222', color: '#fff' }}
+                                />
+
+                                <div style={{ background: '#222', padding: '15px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #333' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', color: '#aaa', fontSize: '0.8rem' }}>CONSUMO HOY (Tokens):</label>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: dailyTokens > 90000 ? '#ff5555' : '#00ff88' }}>
+                                        ⛽ {dailyTokens.toLocaleString()} / ~100k
+                                    </div>
+                                    <small style={{ color: '#666', fontSize: '0.7rem' }}>Si llegas al límite, OLGA cambiará de cerebro automáticamente.</small>
+                                </div>
+
+                                <label style={{ display: 'block', marginBottom: '8px', color: '#aaa', fontSize: '0.9rem' }}>Fecha de Nacimiento:</label>
+                                <input
+                                    type="date"
+                                    value={userBirthDate}
+                                    onChange={e => setUserBirthDate(e.target.value)}
+                                    style={{ width: '100%', padding: '12px', marginBottom: '30px', borderRadius: '10px', border: 'none', background: '#222', color: '#fff' }}
+                                />
+
+                                <button
+                                    onClick={() => setShowSettings(false)}
+                                    style={{ width: '100%', padding: '15px', background: 'linear-gradient(90deg, #00c6ff, #0072ff)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '1.1rem', cursor: 'pointer' }}
+                                >
+                                    ¡Guardar!
+                                </button>
+                            </div>
+                        </div>
                     )}
                 </div>
-            )}
-
-            {/* SETTINGS MODAL */}
-            {showSettings && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, width: '100%', height: '100dvh',
-                    background: 'rgba(0,0,0,0.95)', zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center'
-                }}>
-                    <div style={{ width: '85%', maxWidth: '350px', color: '#fff', textAlign: 'left', background: '#111', padding: '25px', borderRadius: '20px', border: '1px solid #333' }}>
-                        <h2 style={{ textAlign: 'center', margin: '0 0 20px 0', color: '#00f3ff' }}>⚙️ Ajustes</h2>
-
-                        <label style={{ display: 'block', marginBottom: '5px', color: '#aaa', fontSize: '0.9rem' }}>Voz de OLGA:</label>
-                        <select
-                            value={selectedVoiceName}
-                            onChange={(e) => {
-                                setSelectedVoiceName(e.target.value);
-                                localStorage.setItem('olga_voice_name', e.target.value);
-                                speak("Soy OLGA.", e.target.value);
-                            }}
-                            style={{
-                                width: '100%', padding: '12px', marginBottom: '20px',
-                                borderRadius: '10px', background: '#222', color: '#fff', border: '1px solid #444',
-                                fontSize: '0.9rem'
-                            }}
-                        >
-                            <option value="">-- Automática (Mejor) --</option>
-                            {availableVoices.map(v => (
-                                <option key={v.name} value={v.name}>
-                                    {v.name.replace('Microsoft ', '').replace('Google ', '').substring(0, 30)} ({v.lang})
-                                </option>
-                            ))}
-                        </select>
-
-                        <label style={{ display: 'block', marginBottom: '8px', color: '#aaa', fontSize: '0.9rem' }}>Tu Nombre:</label>
-                        <input
-                            type="text"
-                            value={userName}
-                            onChange={e => setUserName(e.target.value)}
-                            placeholder="Ej: Franklin"
-                            style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '10px', border: 'none', background: '#222', color: '#fff' }}
-                        />
-
-                        <div style={{ background: '#222', padding: '15px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #333' }}>
-                            <label style={{ display: 'block', marginBottom: '5px', color: '#aaa', fontSize: '0.8rem' }}>CONSUMO HOY (Tokens):</label>
-                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: dailyTokens > 90000 ? '#ff5555' : '#00ff88' }}>
-                                ⛽ {dailyTokens.toLocaleString()} / ~100k
-                            </div>
-                            <small style={{ color: '#666', fontSize: '0.7rem' }}>Si llegas al límite, OLGA cambiará de cerebro automáticamente.</small>
-                        </div>
-
-                        <label style={{ display: 'block', marginBottom: '8px', color: '#aaa', fontSize: '0.9rem' }}>Fecha de Nacimiento:</label>
-                        <input
-                            type="date"
-                            value={userBirthDate}
-                            onChange={e => setUserBirthDate(e.target.value)}
-                            style={{ width: '100%', padding: '12px', marginBottom: '30px', borderRadius: '10px', border: 'none', background: '#222', color: '#fff' }}
-                        />
-
-                        <button
-                            onClick={() => setShowSettings(false)}
-                            style={{ width: '100%', padding: '15px', background: 'linear-gradient(90deg, #00c6ff, #0072ff)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '1.1rem', cursor: 'pointer' }}
-                        >
-                            ¡Guardar!
-                        </button>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
+            </div >
+        );
 }
