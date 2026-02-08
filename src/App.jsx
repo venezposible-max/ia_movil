@@ -18,7 +18,13 @@ export default function App() {
     const [userBirthDate, setUserBirthDate] = useState(() => localStorage.getItem('olga_birthDate') || '');
     const [showSettings, setShowSettings] = useState(false);
 
+    // REFS PARA ACCEDER AL ESTADO DENTRO DE LISTENERS ANTIGUOS
+    const userNameRef = useRef(userName);
+    const userBirthDateRef = useRef(userBirthDate);
+
     useEffect(() => {
+        userNameRef.current = userName;
+        userBirthDateRef.current = userBirthDate;
         localStorage.setItem('olga_userName', userName);
         localStorage.setItem('olga_birthDate', userBirthDate);
     }, [userName, userBirthDate]);
@@ -129,7 +135,7 @@ export default function App() {
                         INSTRUCCIONES:
                         1. Mantén el hilo.
                         2. Si preguntan la HORA: Dí SOLO la hora. 
-                        3. USUARIO: ${userName || 'Anónimo'}. (Cumpleaños: ${userBirthDate || 'Desconocido'})`
+                        3. USUARIO: ${userNameRef.current || 'Anónimo'}. (Cumpleaños: ${userBirthDateRef.current || 'Desconocido'})`
                         },
                         ...currentHistory.slice(-15).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
                         { role: "user", content: text + searchContext }
