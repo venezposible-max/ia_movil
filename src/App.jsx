@@ -269,10 +269,24 @@ export default function App() {
         }
 
         if (!selectedVoice) {
-            const esVoices = allVoices.filter(v => v.lang.toLowerCase().includes('es'));
-            selectedVoice = esVoices.find(v =>
-                v.name.includes('Paulina') || v.name.includes('Mexico') || v.name.includes('Google español de Estados Unidos')
-            ) || esVoices.find(v => !v.name.toLowerCase().includes('monica')) || esVoices[0];
+            // ALERTA ANTI-PORTUGUÉS: FILTRADO ESTRICTO
+            const cleanVoices = allVoices.filter(v =>
+                v.lang.toLowerCase().startsWith('es') &&
+                !v.name.toLowerCase().includes('portu') &&
+                !v.name.toLowerCase().includes('brazil') &&
+                !v.name.toLowerCase().includes('br') &&
+                !v.lang.toLowerCase().includes('pt')
+            );
+
+            // BUSQUEDA PRIORITARIA LATINA
+            selectedVoice = cleanVoices.find(v => v.name.includes('Paulina')) ||
+                cleanVoices.find(v => v.name.includes('Sabina')) ||
+                cleanVoices.find(v => v.name.includes('Mexico')) ||
+                cleanVoices.find(v => v.name.includes('Google español de Estados Unidos')) ||
+                cleanVoices.find(v => v.lang === 'es-MX') ||
+                cleanVoices.find(v => v.lang === 'es-US') ||
+                cleanVoices.find(v => v.lang === 'es-419') ||
+                cleanVoices[0];
         }
 
         if (selectedVoice) {
@@ -282,8 +296,8 @@ export default function App() {
             utterance.lang = 'es-MX';
         }
 
-        utterance.pitch = 1.0;
-        utterance.rate = 1.1;
+        utterance.pitch = 1.05;
+        utterance.rate = 1.15;
 
         utterance.onstart = () => setIsSpeaking(true);
         utterance.onend = () => setIsSpeaking(false);
