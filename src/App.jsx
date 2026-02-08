@@ -22,12 +22,91 @@ export default function App() {
     const userNameRef = useRef(userName);
     const userBirthDateRef = useRef(userBirthDate);
 
+    // ESTADOS CÁMARA (VISIÓN)
+    const [showCamera, setShowCamera] = useState(false);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const videoRef = useRef(null);
+    const canvasRef = useRef(null);
+
     useEffect(() => {
         userNameRef.current = userName;
         userBirthDateRef.current = userBirthDate;
         localStorage.setItem('olga_userName', userName);
         localStorage.setItem('olga_birthDate', userBirthDate);
     }, [userName, userBirthDate]);
+
+    // FUNCIONES DE CÁMARA
+    const startCamera = async () => {
+        try {
+            setShowCamera(true);
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+            }
+        } catch (err) {
+            setError('Error Cámara: ' + err.message);
+            setShowCamera(false);
+        }
+    };
+
+    const stopCamera = () => {
+        if (videoRef.current && videoRef.current.srcObject) {
+            const tracks = videoRef.current.srcObject.getTracks();
+            tracks.forEach(track => track.stop());
+            videoRef.current.srcObject = null;
+        }
+        setShowCamera(false);
+    };
+
+    const analyzeImage = async () => {
+        if (!videoRef.current || !canvasRef.current) return;
+        setIsAnalyzing(true);
+        speak("Déjame ver...");
+
+        // 1. CAPTURAR FOTO
+        const context = canvasRef.current.getContext('2d');
+        canvasRef.current.width = videoRef.current.videoWidth;
+        canvasRef.current.height = videoRef.current.videoHeight;
+        context.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
+        const imageBase64 = canvasRef.current.toDataURL('image/jpeg', 0.5); // Calidad media para velocidad
+
+        try {
+            // 2. ENVIAR A LLAMA 3.2 VISION
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: "llama-3.2-11b-vision-preview", // MODELO DE VISIÓN
+                    messages: [
+                        {
+                            role: "user",
+                            content: [
+                                { type: "text", text: `Describe BREVEMENTE qué ves en esta imagen. Habla como OLGA (soy tu usuario ${userName || 'amigo'}).` },
+                                { type: "image_url", image_url: { url: imageBase64 } }
+                            ]
+                        }
+                    ],
+                    max_tokens: 150
+                })
+            });
+
+            const data = await response.json();
+            const description = data.choices[0].message.content;
+
+            // 3. RESPONDEMOS
+            setMessages(prev => [...prev, { role: 'ai', text: "[👁️ VEO]: " + description }]);
+            speak(description);
+
+        } catch (e) {
+            console.error(e);
+            speak("No pude ver bien. Intenta otra vez.");
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
 
     const [svgContent, setSvgContent] = useState(null);
     const [generatedImage, setGeneratedImage] = useState(null);
@@ -233,6 +312,8 @@ export default function App() {
             </div>
 
             <button
+                onClick={() => setShowSettings(true)}
+                title="Configuración"
                 style={{
                     position: 'absolute', top: '90px', right: '20px', // MUCHO MÁS ABAJO
                     background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%',
@@ -240,11 +321,72 @@ export default function App() {
                     display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000,
                     color: '#fff', backdropFilter: 'blur(10px)', boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
                 }}
-                title="Configuración"
-                onClick={() => setShowSettings(true)}
             >
                 ⚙️
             </button>
+
+            {/* BOTÓN DE VISIÓN (OJO) */}
+            <button
+                onClick={startCamera}
+                style={{
+                    position: 'absolute', top: '90px', left: '20px', // A LA IZQUIERDA
+                    background: 'rgba(0, 243, 255, 0.15)', border: '1px solid rgba(0, 243, 255, 0.3)', borderRadius: '50%',
+                    width: '50px', height: '50px', cursor: 'pointer', fontSize: '1.8rem',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000,
+                    color: '#00f3ff', backdropFilter: 'blur(10px)', boxShadow: '0 0 15px rgba(0, 243, 255, 0.2)'
+                }}
+                title="Activar Visión (Cámara)"
+            >
+                👁️
+            </button>
+
+            {/* PANTALLA DE CÁMARA (VISOR) */}
+            {showCamera && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+                    background: '#000', zIndex: 99999, display: 'flex', flexDirection: 'column'
+                }}>
+                    <video ref={videoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+                    {/* UI DE CÁMARA */}
+                    <button
+                        onClick={stopCamera}
+                        style={{
+                            position: 'absolute', top: '40px', left: '20px',
+                            background: 'rgba(0,0,0,0.5)', color: '#fff', border: 'none',
+                            borderRadius: '50%', width: '40px', height: '40px', fontSize: '1.5rem', zIndex: 10
+                        }}
+                    >
+                        ❌
+                    </button>
+
+                    <button
+                        onClick={analyzeImage}
+                        disabled={isAnalyzing}
+                        style={{
+                            position: 'absolute', bottom: '50px', left: '50%', transform: 'translateX(-50%)',
+                            background: isAnalyzing ? '#555' : '#fff',
+                            color: '#000', border: '5px solid rgba(255,255,255,0.3)',
+                            borderRadius: '50%', width: '80px', height: '80px',
+                            fontSize: '2rem', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: '0 0 20px rgba(255,255,255,0.5)'
+                        }}
+                    >
+                        {isAnalyzing ? '⏳' : '📸'}
+                    </button>
+
+                    {isAnalyzing && (
+                        <div style={{
+                            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                            color: '#00f3ff', fontSize: '1.5rem', fontWeight: 'bold', background: 'rgba(0,0,0,0.7)',
+                            padding: '10px 20px', borderRadius: '20px'
+                        }}>
+                            🧠 Analizando...
+                        </div>
+                    )}
+                </div>
+            )}
             <div className='main-content'>
 
                 {generatedImage && (
@@ -374,6 +516,6 @@ export default function App() {
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 }
