@@ -301,7 +301,7 @@ export default function App() {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    model: "llama3-70b-8192", // Modelo más estable
+                    model: "llama-3.3-70b-versatile", // ÚLTIMO MODELO ACTIVO
                     messages: [
                         { role: "system", content: `Eres OLGA, asistente virtual en español. ${userInfo} IMPORTANTE: ERES ÚTIL Y BREVE. Si hay alarmas o noticias, confírmalo.` },
                         ...messagesRef.current.slice(-6).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })), // Reducimos contexto a 6 para evitar overflow
