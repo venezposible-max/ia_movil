@@ -38,7 +38,7 @@ body {
     max-width: 500px;
     height: 100dvh;
     display: flex;
-    flexDirection: column;
+    flex-direction: column;
     position: relative;
     background: rgba(0, 0, 0, 0.2);
     backdrop-filter: blur(5px);
@@ -47,7 +47,7 @@ body {
 .container {
     flex: 1;
     display: flex;
-    flexDirection: column;
+    flex-direction: column;
     padding: 20px;
     gap: 20px;
     height: 100%;
@@ -78,38 +78,37 @@ body {
 .main-content {
     flex: 1;
     display: flex;
-    flexDirection: column;
+    flex-direction: column;
     justify-content: center;
-    alignItems: center;
+    align-items: center;
     position: relative;
     min-height: 0;
     /* Permite shrinking */
 }
 
-/* ORB BUTTON (El Núcleo) */
+/* ORB BUTTON (El Núcleo - MÁS GRANDE) */
 .orb-container {
     flex: 0 0 auto;
     display: flex;
-    flexDirection: column;
-    alignItems: center;
+    flex-direction: column;
+    align-items: center;
     justify-content: center;
-    margin-bottom: 20px;
     z-index: 10;
 }
 
 .orb-button {
-    width: 160px;
-    height: 160px;
-    borderRadius: 50%;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
     border: none;
     background: rgba(10, 10, 20, 0.6);
     backdrop-filter: blur(10px);
     position: relative;
     cursor: pointer;
     display: flex;
-    justifyContent: center;
-    alignItems: center;
-    box-shadow: 0 0 30px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(0, 0, 0, 0.8);
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.5), inset 0 0 40px rgba(0, 0, 0, 0.8);
     transition: all 0.4s;
 }
 
@@ -120,7 +119,7 @@ body {
     left: -5px;
     right: -5px;
     bottom: -5px;
-    borderRadius: 50%;
+    border-radius: 50%;
     border: 2px solid transparent;
     background: linear-gradient(45deg, var(--accent-cyan), var(--accent-purple)) border-box;
     -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
@@ -204,11 +203,13 @@ body {
 
 .status-text {
     margin-top: 30px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.9rem;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 2px;
-    color: rgba(255, 255, 255, 0.6);
+    color: #fff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
 }
 
 /* CHAT LOG */
@@ -218,7 +219,7 @@ body {
     max-height: 30%;
     overflow-y: auto;
     display: flex;
-    flexDirection: column;
+    flex-direction: column;
     gap: 10px;
     padding: 10px;
     margin-top: auto;
@@ -229,9 +230,9 @@ body {
     display: flex;
     gap: 12px;
     padding: 12px 16px;
-    borderRadius: 12px;
+    border-radius: 12px;
     font-size: 0.9rem;
-    lineHeight: 1.4;
+    line-height: 1.4;
     backdrop-filter: blur(12px);
 }
 
@@ -256,5 +257,5 @@ body {
     margin-top: 10px;
     background: rgba(255, 0, 0, 0.1);
     padding: 5px 10px;
-    borderRadius: 4px;
+    border-radius: 4px;
 }
