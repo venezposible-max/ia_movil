@@ -13,6 +13,16 @@ export default function App() {
     const [error, setError] = useState('');
     const [voiceGender, setVoiceGender] = useState('female');
 
+    // DATOS DE USUARIO (PERSISTENTES)
+    const [userName, setUserName] = useState(() => localStorage.getItem('olga_userName') || '');
+    const [userBirthDate, setUserBirthDate] = useState(() => localStorage.getItem('olga_birthDate') || '');
+    const [showSettings, setShowSettings] = useState(false);
+
+    useEffect(() => {
+        localStorage.setItem('olga_userName', userName);
+        localStorage.setItem('olga_birthDate', userBirthDate);
+    }, [userName, userBirthDate]);
+
     const [svgContent, setSvgContent] = useState(null);
     const [generatedImage, setGeneratedImage] = useState(null);
     const [imageLoading, setImageLoading] = useState(false);
@@ -39,7 +49,20 @@ export default function App() {
             recognition.onstart = () => { setIsListening(true); setError(''); };
             recognition.onend = () => { setIsListening(false); };
             recognition.onerror = (e) => {
-                if (e.error !== 'no-speech') setError('Error Voz: ' + e.error);
+                if (e.error === 'no-speech') return;
+
+                // DETECCIÓN ESPECÍFICA PARA IPHONE/IPAD
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+                if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+                    if (isIOS) {
+                        setError('🍎 En iPhone, Apple bloquea el micrófono en Chrome/Google. POR FAVOR USA SAFARI.');
+                    } else {
+                        setError('⚠️ Micrófono bloqueado. Revisa permisos o usa Chrome/Safari.');
+                    }
+                } else {
+                    setError('Error Voz: ' + e.error);
+                }
                 setIsListening(false);
             };
             recognition.onresult = (e) => {
@@ -106,7 +129,8 @@ export default function App() {
                         INSTRUCCIONES:
                         1. Mantén el hilo.
                         2. Si preguntan la HORA: Dí SOLO la hora. 
-                        3. GENERAR IMAGEN: Si piden imagen, responde SOLO con: "GENERANDO_IMAGEN: [Prompt en ingles]"` },
+                        3. USUARIO: ${userName || 'Anónimo'}. (Cumpleaños: ${userBirthDate || 'Desconocido'})
+                        4. GENERAR IMAGEN: Si piden imagen, responde SOLO con: "GENERANDO_IMAGEN: [Prompt en ingles]"` },
                         ...currentHistory.slice(-15).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
                         { role: "user", content: text + searchContext }
                     ],
@@ -203,7 +227,6 @@ export default function App() {
             </div>
 
             <button
-                onClick={() => { setMessages([]); if (isSpeaking) synthRef.current.cancel(); setIsSpeaking(false); setGeneratedImage(null); }}
                 style={{
                     position: 'absolute', top: '20px', right: '20px',
                     background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
@@ -211,9 +234,10 @@ export default function App() {
                     display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10,
                     color: '#fff'
                 }}
-                title="Nueva Conversación"
+                title="Configuración"
+                onClick={() => setShowSettings(true)}
             >
-                🗑️
+                ⚙️
             </button>
             <div className='main-content'>
 
@@ -271,6 +295,78 @@ export default function App() {
                         </div>
                     ))}
                 </div>
+
+                {/* MODAL DE CONFIGURACIÓN */}
+                {showSettings && (
+                    <div style={{
+                        position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+                        background: 'rgba(0,0,0,0.85)', zIndex: 100,
+                        display: 'flex', justifyContent: 'center', alignItems: 'center',
+                        backdropFilter: 'blur(8px)'
+                    }}>
+                        <div style={{
+                            background: '#1a1a2e', padding: '25px', borderRadius: '25px',
+                            width: '85%', maxWidth: '350px', border: '1px solid rgba(0,243,255,0.3)',
+                            boxShadow: '0 0 50px rgba(0,243,255,0.2)', color: '#fff'
+                        }}>
+                            <h2 style={{ marginTop: 0, marginBottom: '20px', color: '#00f3ff', textAlign: 'center', fontSize: '1.5rem' }}>
+                                ⚙️ Ajustes
+                            </h2>
+
+                            <div style={{ marginBottom: '15px' }}>
+                                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: '#aaa' }}>Tu Nombre:</label>
+                                <input
+                                    type="text" value={userName} onChange={e => setUserName(e.target.value)}
+                                    placeholder="Ej: Franklin"
+                                    style={{
+                                        width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #333',
+                                        background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: '1rem'
+                                    }}
+                                />
+                            </div>
+
+                            <div style={{ marginBottom: '25px' }}>
+                                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: '#aaa' }}>Fecha de Nacimiento:</label>
+                                <input
+                                    type="date" value={userBirthDate} onChange={e => setUserBirthDate(e.target.value)}
+                                    style={{
+                                        width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #333',
+                                        background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: '1rem'
+                                    }}
+                                />
+                            </div>
+
+                            <button
+                                onClick={() => setShowSettings(false)}
+                                style={{
+                                    width: '100%', padding: '15px', borderRadius: '15px', border: 'none',
+                                    background: 'linear-gradient(90deg, #00c6ff, #0072ff)', color: '#fff', fontWeight: 'bold', fontSize: '1.1rem',
+                                    marginBottom: '20px', cursor: 'pointer'
+                                }}
+                            >
+                                ¡Guardar y Cerrar!
+                            </button>
+
+                            <div style={{ borderTop: '1px solid #333', paddingTop: '20px', textAlign: 'center' }}>
+                                <button
+                                    onClick={() => {
+                                        if (window.confirm('¿Seguro que quieres borrar toda la memoria?')) {
+                                            setMessages([]);
+                                            setSvgContent(null);
+                                            setGeneratedImage(null);
+                                            if (isSpeaking) synthRef.current.cancel();
+                                            setIsSpeaking(false);
+                                            setShowSettings(false);
+                                        }
+                                    }}
+                                    style={{ color: '#ff5555', background: 'transparent', border: 'none', fontSize: '0.9rem', cursor: 'pointer' }}
+                                >
+                                    🗑️ Borrar Memoria y Reiniciar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
