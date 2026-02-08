@@ -37,6 +37,51 @@ export default function App() {
     const synthRef = useRef(window.speechSynthesis);
     const abortControllerRef = useRef(null);
 
+    // ALARMAS
+    const [alarms, setAlarms] = useState([]);
+
+    // VIGILANTE DE ALARMAS
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const now = new Date();
+            const currentHM = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+            // Solo mirar segundos 00 para no repetir mucho
+            if (now.getSeconds() !== 0) return;
+
+            setAlarms(prev => {
+                const triggered = prev.filter(al => al.time === currentHM);
+                const remaining = prev.filter(al => al.time !== currentHM);
+
+                if (triggered.length > 0) {
+                    triggered.forEach(t => {
+                        speak(`¡Atención! Es la hora de: ${t.label}`);
+                        // Sonido de Alarma (Oscilador navegador para no depender de archivos)
+                        playAlarmSound();
+                    });
+                }
+                return remaining;
+            });
+        }, 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const playAlarmSound = () => {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(440, ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(880, ctx.currentTime + 0.1);
+        osc.frequency.linearRampToValueAtTime(440, ctx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.5, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 1);
+    };
+
     // CÁMARA & IMAGEN
     const [showCamera, setShowCamera] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -213,7 +258,41 @@ export default function App() {
             userInfo += ` Edad: ${age} años (Nació: ${userBirthDateRef.current}).`;
         }
 
-        const timeInfo = `[SISTEMA: Hoy es ${now.toLocaleDateString()} ${now.toLocaleTimeString()}. ${userInfo}]`;
+        // 4. SISTEMA DE ALARMAS (REGEX)
+        // Patrones: "alarma a las 10:30", "despiertame a las 7:00", "avisame en 5 minutos"
+        const alarmTimeRegex = /(?:alarma|despiertame|avisame).+?(\d{1,2})[:\.](\d{2})/i;
+        const alarmInRegex = /(?:alarma|despiertame|avisame).+?(\d+)\s*(?:min|seg)/i; // "en 5 min"
+
+        let alarmContext = '';
+        let triggerAlarm = null;
+
+        const setAlarm = (time, label) => {
+            const newAlarm = { time, label, id: Date.now() };
+            setAlarms(prev => [...prev, newAlarm]);
+            return `[SISTEMA: Alarma configurada para las ${time}]`;
+        };
+
+        const matchTime = text.match(alarmTimeRegex);
+        const matchIn = text.match(alarmInRegex);
+
+        if (matchTime) {
+            let h = parseInt(matchTime[1]);
+            const m = matchTime[2].padStart(2, '0');
+            // Asumimos AM/PM si el usuario no especifica, o formato 24h
+            if (text.toLowerCase().includes('pm') && h < 12) h += 12;
+            else if (text.toLowerCase().includes('am') && h === 12) h = 0;
+
+            const timeStr = `${h.toString().padStart(2, '0')}:${m}`;
+            alarmContext = setAlarm(timeStr, "Alarma programada");
+        } else if (matchIn) {
+            const num = parseInt(matchIn[1]);
+            const isSeg = text.includes('seg');
+            const targetDate = new Date(Date.now() + num * (isSeg ? 1000 : 60000));
+            const timeStr = `${targetDate.getHours().toString().padStart(2, '0')}:${targetDate.getMinutes().toString().padStart(2, '0')}`;
+            alarmContext = setAlarm(timeStr, `Timer de ${num} ${isSeg ? 'seg' : 'min'}`);
+        }
+
+        const timeInfo = `[SISTEMA: Hoy es ${now.toLocaleDateString()} ${now.toLocaleTimeString()}. ${userInfo} ${alarmContext}]`;
 
         try {
             const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -222,7 +301,7 @@ export default function App() {
                 body: JSON.stringify({
                     model: "llama-3.3-70b-versatile",
                     messages: [
-                        { role: "system", content: `Eres OLGA, una IA leal y sarcástica. ${userInfo} IMPORTANTE: RESPONDE SIEMPRE EN ESPAÑOL LATINO. No hables portugués ni inglés salvo que te lo pidan explícitamente. Sé breve y directa.` },
+                        { role: "system", content: `Eres OLGA. ${userInfo} IMPORTANTE: RESPONDE SIEMPRE EN ESPAÑOL LATINO. Si configuras una alarma, confirma la hora al usuario.` },
                         ...messagesRef.current.slice(-10).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
                         { role: "user", content: text + searchContext + "\n" + timeInfo }
                     ],
