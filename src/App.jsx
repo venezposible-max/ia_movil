@@ -11,12 +11,11 @@ export default function App() {
     const [messages, setMessages] = useState([]);
     const [error, setError] = useState('');
 
-    // DATOS DE USUARIO (PERSISTENTES)
+    // DATOS DE USUARIO
     const [userName, setUserName] = useState(() => localStorage.getItem('olga_user_name') || '');
     const [userBirthDate, setUserBirthDate] = useState(() => localStorage.getItem('olga_user_birth') || '');
     const [showSettings, setShowSettings] = useState(false);
 
-    // REFS
     const userNameRef = useRef(userName);
     const userBirthDateRef = useRef(userBirthDate);
     const messagesRef = useRef([]);
@@ -24,7 +23,7 @@ export default function App() {
     const synthRef = useRef(window.speechSynthesis);
     const abortControllerRef = useRef(null);
 
-    // ESTADOS CÁMARA & IMAGEN
+    // CÁMARA & IMAGEN
     const [showCamera, setShowCamera] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const videoRef = useRef(null);
@@ -72,7 +71,7 @@ export default function App() {
         }
     }, []);
 
-    // --- FUNCIONES CÁMARA ---
+    // --- CÁMARA ---
     const startCamera = async () => {
         try {
             setShowCamera(true);
@@ -112,7 +111,7 @@ export default function App() {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    model: "meta-llama/llama-4-scout-17b-16e-instruct",
+                    model: "meta-llama/llama-4-scout-17b-16e-instruct", // VISION MODEL 2026
                     messages: [
                         { role: "user", content: [{ type: "text", text: `Describe BREVEMENTE qué ves. Eres OLGA.` }, { type: "image_url", image_url: { url: imageBase64 } }] }
                     ],
@@ -134,7 +133,7 @@ export default function App() {
         }
     };
 
-    // --- LÓGICA CORE ---
+    // --- CORE LOGIC ---
     const SERPER_API_KEY = (typeof __SERPER_KEY__ !== 'undefined' ? __SERPER_KEY__ : '') || import.meta.env.VITE_SERPER_API_KEY || '';
 
     const handleUserMessage = async (text) => {
@@ -157,9 +156,6 @@ export default function App() {
             } catch (e) { }
         }
 
-        // 2. GOOGLE CHECK
-        /* (Simplificado para brevedad, mantener lógica Serper si es vital) */
-
         try {
             const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
@@ -181,8 +177,8 @@ export default function App() {
             const aiText = data.choices[0].message.content;
 
             if (aiText.includes('GENERANDO_IMAGEN:')) {
-                // ... lógica imagen
                 setMessages(prev => [...prev, { role: 'ai', text: "Generando imagen..." }]);
+                // Image logic would go here
             } else {
                 setMessages(prev => [...prev, { role: 'ai', text: aiText }]);
                 speak(aiText);
@@ -220,78 +216,123 @@ export default function App() {
         }
     };
 
-    // --- NUEVO DESIGN SYSTEM MÓVIL ---
+    // --- DISEÑO CLÁSICO (RESTORED) ---
     return (
-        <div className="mobile-layout">
+        <div className='container'>
 
-            {/* 1. HEADER */}
-            <div className="header-compact">
-                <div className="brand" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1.4rem' }}>⚡</span> OLGA
-                    <span style={{ fontSize: '0.6rem', opacity: 0.5, letterSpacing: '2px', fontWeight: 400 }}>AI VISION</span>
-                </div>
-                <div className="status-dot" style={{ color: API_KEY ? '#00ff88' : '#ff5555' }}>
-                    {API_KEY ? 'ONLINE' : 'OFFLINE'}
-                </div>
+            {/* HEADER CLÁSICO */}
+            <div className='header'>
+                <h1>⚡ OLGA AI</h1>
+                <p>Neural Network • Llama 4 • Live Search</p>
+                <span style={{ fontSize: '0.7rem', color: API_KEY ? '#4caf50' : '#ff5555', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '10px' }}>
+                    {API_KEY ? '✅ Sistema Online' : `❌ Falta API Key (${API_KEY?.length || 0})`}
+                </span>
             </div>
 
-            {/* 2. CHAT AREA */}
-            <div className="content-area">
-                {messages.length === 0 && (
-                    <div style={{ textAlign: 'center', opacity: 0.3, marginTop: '50px' }}>
-                        <p>Soy OLGA. Toca el núcleo para hablar.</p>
+            {/* BOTÓN CONFIG (ENGRANAJE) - POSICIÓN CORREGIDA */}
+            <button
+                onClick={() => setShowSettings(true)}
+                title="Configuración"
+                style={{
+                    position: 'absolute', top: 'calc(20px + env(safe-area-inset-top))', right: '20px',
+                    background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%',
+                    width: '50px', height: '50px', cursor: 'pointer', fontSize: '1.8rem',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000,
+                    color: '#fff', backdropFilter: 'blur(10px)', boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
+                }}
+            >
+                ⚙️
+            </button>
+
+            {/* BOTÓN VISIÓN (OJO) - POSICIÓN CORREGIDA */}
+            <button
+                onClick={startCamera}
+                title="Activar Visión"
+                style={{
+                    position: 'absolute', top: 'calc(20px + env(safe-area-inset-top))', left: '20px',
+                    background: 'rgba(0, 243, 255, 0.15)', border: '1px solid rgba(0, 243, 255, 0.3)', borderRadius: '50%',
+                    width: '50px', height: '50px', cursor: 'pointer', fontSize: '1.8rem',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000,
+                    color: '#00f3ff', backdropFilter: 'blur(10px)', boxShadow: '0 0 15px rgba(0, 243, 255, 0.2)'
+                }}
+            >
+                👁️
+            </button>
+
+            {/* CONTENIDO PRINCIPAL (ORBE) */}
+            <div className='main-content'>
+
+                {generatedImage && (
+                    <div style={{ marginBottom: '20px', padding: '5px', background: 'rgba(255,255,255,0.1)', borderRadius: '15px' }}>
+                        <img src={generatedImage} alt="Arte" style={{ width: '300px', borderRadius: '10px' }} />
                     </div>
                 )}
 
-                {messages.map((msg, i) => (
-                    <div key={i} className={`chat-bubble ${msg.role}`}>
-                        {msg.text}
-                    </div>
-                ))}
-
-                {error && <div className="error-toast">⚠️ {error}</div>}
-            </div>
-
-            {/* 3. DOCK CONTROL V2 */}
-            <div className="control-dock">
-                <button className="dock-btn vision" onClick={startCamera}>👁️</button>
-
-                <div
-                    className={`orb-core ${isListening ? 'listening' : isThinking ? 'thinking' : isSpeaking ? 'speaking' : ''}`}
-                    onClick={toggleListening}
-                >
-                    <div className="orb-icon">
-                        {isThinking ? '⏳' : isSpeaking ? '🔊' : isListening ? '🎙️' : '🧠'}
+                <div className='orb-container'>
+                    <button
+                        className={`orb-button ${isListening ? 'listening' : ''} ${isThinking ? 'thinking' : ''} ${isSpeaking ? 'speaking' : ''}`}
+                        onClick={toggleListening}
+                    >
+                        <div className="icon" style={{ fontSize: '3rem' }}>
+                            {isThinking ? <Loader className='icon spin' size={64} /> :
+                                isSpeaking ? <Volume2 className='icon' size={64} /> :
+                                    isListening ? <Mic className='icon' size={64} /> :
+                                        <Bot size={64} />}
+                        </div>
+                    </button>
+                    <div className='status-text'>
+                        {isThinking ? 'Procesando...' : isSpeaking ? 'Hablando...' : isListening ? 'Escuchando...' : 'TOCA PARA HABLAR'}
                     </div>
                 </div>
 
-                <button className="dock-btn" onClick={() => setShowSettings(true)}>⚙️</button>
+                {error && <div className='error-msg'>⚠️ {error}</div>}
             </div>
 
-            {/* --- OVERLAYS --- */}
+            {/* CHAT LOG */}
+            <div className='chat-log'>
+                {messages.length === 0 && <div style={{ opacity: 0.5, textAlign: 'center', fontSize: '0.8rem' }}>Historial vacío</div>}
+                {messages.slice(-3).map((msg, idx) => (
+                    <div key={idx} className={`message ${msg.role}`}>
+                        <strong>{msg.role === 'ai' ? '🤖' : '👤'}:</strong> {msg.text}
+                    </div>
+                ))}
+            </div>
 
-            {/* CAMARA - CAPA SUPERIOR */}
+            {/* CÁMARA UI - REPARADA (BOTONES ALTOS) */}
             {showCamera && (
                 <div style={{
-                    position: 'fixed', top: 0, left: 0, width: '100%', height: '100dvh',
-                    background: '#000', zIndex: 99999, display: 'flex', flexDirection: 'column'
+                    position: 'fixed', top: 0, left: 0, width: '100%', height: '100dvh', // 100dvh IMPORTANTE
+                    background: '#000', zIndex: 999999, display: 'flex', flexDirection: 'column'
                 }}>
                     <video ref={videoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     <canvas ref={canvasRef} style={{ display: 'none' }} />
 
                     <button onClick={stopCamera} style={{
-                        position: 'absolute', top: '40px', left: '20px',
-                        background: 'rgba(0,0,0,0.5)', color: '#fff', border: 'none', borderRadius: '50%',
-                        width: '40px', height: '40px', fontSize: '1.2rem', cursor: 'pointer', zIndex: 100
-                    }}>✕</button>
+                        position: 'absolute', bottom: 'calc(120px + env(safe-area-inset-bottom))', left: '20px',
+                        background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)',
+                        borderRadius: '30px', padding: '12px 24px', fontSize: '1rem', fontWeight: 'bold', zIndex: 100,
+                        backdropFilter: 'blur(5px)'
+                    }}>⬅️ Volver</button>
 
                     <button onClick={analyzeImage} disabled={isAnalyzing} style={{
-                        position: 'absolute', bottom: '120px', left: '50%', transform: 'translateX(-50%)',
-                        background: '#fff', width: '80px', height: '80px', borderRadius: '50%',
-                        border: '5px solid rgba(255,255,255,0.4)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem'
+                        position: 'absolute', bottom: 'calc(120px + env(safe-area-inset-bottom))',
+                        left: '50%', transform: 'translateX(-50%)',
+                        background: isAnalyzing ? '#555' : '#fff',
+                        color: '#000', border: '5px solid rgba(255,255,255,0.3)',
+                        borderRadius: '50%', width: '80px', height: '80px',
+                        fontSize: '2rem', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 0 20px rgba(255,255,255,0.5)'
                     }}>
                         {isAnalyzing ? '⏳' : '📸'}
                     </button>
+
+                    {isAnalyzing && (
+                        <div style={{
+                            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                            color: '#00f3ff', fontSize: '1.5rem', fontWeight: 'bold', background: 'rgba(0,0,0,0.7)',
+                            padding: '10px 20px', borderRadius: '20px', zIndex: 101, pointerEvents: 'none'
+                        }}>🧠 Analizando...</div>
+                    )}
                 </div>
             )}
 
@@ -299,23 +340,12 @@ export default function App() {
             {showSettings && (
                 <div style={{
                     position: 'fixed', top: 0, left: 0, width: '100%', height: '100dvh',
-                    background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(15px)', zIndex: 10000,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+                    background: 'rgba(0,0,0,0.95)', zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center'
                 }}>
-                    <div style={{ width: '100%', maxWidth: '350px', background: '#1a1a2e', borderRadius: '24px', padding: '24px', border: '1px solid #333' }}>
-                        <h2 style={{ margin: '0 0 20px 0', fontSize: '1.2rem', color: '#fff', textAlign: 'center' }}>Ajustes</h2>
-
-                        <label style={{ display: 'block', fontSize: '0.8rem', color: '#888', marginBottom: '5px' }}>Nombre</label>
-                        <input
-                            type="text" defaultValue={userName}
-                            onChange={(e) => setUserName(e.target.value)}
-                            style={{ width: '100%', padding: '12px', background: '#222', border: 'none', borderRadius: '12px', color: '#fff', marginBottom: '15px' }}
-                        />
-
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-                            <button onClick={() => { if (confirm('¿Borrar?')) { setMessages([]); window.location.reload(); } }} style={{ flex: 1, padding: '12px', background: 'rgba(255,50,50,0.1)', color: '#ff5555', border: 'none', borderRadius: '12px' }}>Reset</button>
-                            <button onClick={() => setShowSettings(false)} style={{ flex: 1, padding: '12px', background: '#00f3ff', color: '#000', border: 'none', borderRadius: '12px', fontWeight: 'bold' }}>Listo</button>
-                        </div>
+                    <div style={{ width: '85%', maxWidth: '350px', color: '#fff', textAlign: 'center' }}>
+                        <h2>⚙️ Ajustes</h2>
+                        <input type="text" value={userName} onChange={e => setUserName(e.target.value)} placeholder="Nombre" style={{ width: '100%', padding: '15px', marginBottom: '20px', borderRadius: '10px' }} />
+                        <button onClick={() => setShowSettings(false)} style={{ width: '100%', padding: '15px', background: '#00f3ff', border: 'none', borderRadius: '10px' }}>Listo</button>
                     </div>
                 </div>
             )}
