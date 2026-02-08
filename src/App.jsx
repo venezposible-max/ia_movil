@@ -420,10 +420,32 @@ export default function App() {
                     position: 'fixed', top: 0, left: 0, width: '100%', height: '100dvh',
                     background: 'rgba(0,0,0,0.95)', zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center'
                 }}>
-                    <div style={{ width: '85%', maxWidth: '350px', color: '#fff', textAlign: 'center' }}>
-                        <h2>⚙️ Ajustes</h2>
-                        <input type="text" value={userName} onChange={e => setUserName(e.target.value)} placeholder="Nombre" style={{ width: '100%', padding: '15px', marginBottom: '20px', borderRadius: '10px' }} />
-                        <button onClick={() => setShowSettings(false)} style={{ width: '100%', padding: '15px', background: '#00f3ff', border: 'none', borderRadius: '10px' }}>Listo</button>
+                    <div style={{ width: '85%', maxWidth: '350px', color: '#fff', textAlign: 'left', background: '#111', padding: '25px', borderRadius: '20px', border: '1px solid #333' }}>
+                        <h2 style={{ textAlign: 'center', margin: '0 0 20px 0', color: '#00f3ff' }}>⚙️ Ajustes</h2>
+
+                        <label style={{ display: 'block', marginBottom: '8px', color: '#aaa', fontSize: '0.9rem' }}>Tu Nombre:</label>
+                        <input
+                            type="text"
+                            value={userName}
+                            onChange={e => setUserName(e.target.value)}
+                            placeholder="Ej: Franklin"
+                            style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '10px', border: 'none', background: '#222', color: '#fff' }}
+                        />
+
+                        <label style={{ display: 'block', marginBottom: '8px', color: '#aaa', fontSize: '0.9rem' }}>Fecha de Nacimiento:</label>
+                        <input
+                            type="date"
+                            value={userBirthDate}
+                            onChange={e => setUserBirthDate(e.target.value)}
+                            style={{ width: '100%', padding: '12px', marginBottom: '30px', borderRadius: '10px', border: 'none', background: '#222', color: '#fff' }}
+                        />
+
+                        <button
+                            onClick={() => setShowSettings(false)}
+                            style={{ width: '100%', padding: '15px', background: 'linear-gradient(90deg, #00c6ff, #0072ff)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '1.1rem', cursor: 'pointer' }}
+                        >
+                            ¡Guardar!
+                        </button>
                     </div>
                 </div>
             )}
