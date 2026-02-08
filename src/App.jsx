@@ -297,28 +297,50 @@ export default function App() {
             const now = new Date();
             const systemContext = `[SISTEMA: Hoy es ${now.toLocaleDateString()} ${now.toLocaleTimeString()}. ${userInfo}] ${alarmMsg} ${contextParts.join('\n')}`;
 
-            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    model: "llama-3.1-8b-instant", // MODO TURBO (RAPIDÍSIMO Y SEGURO)
-                    messages: [
-                        { role: "system", content: `Eres OLGA, asistente virtual en español. ${userInfo} IMPORTANTE: ERES ÚTIL Y BREVE. Si hay alarmas o noticias, confírmalo.` },
-                        ...messagesRef.current.slice(-6).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })), // Reducimos contexto a 6 para evitar overflow
-                        { role: "user", content: text + "\n" + systemContext }
-                    ],
-                    max_tokens: 400
-                }),
-                signal: abortControllerRef.current.signal
-            });
+            // 5. CEREBRO ROBUSTO (ROTACIÓN DE MODELOS) - SISTEMA ANTI-CAÍDAS
+            const MODELS = [
+                "llama-3.1-8b-instant",    // 1. Prioridad: Velocidad
+                "llama-3.3-70b-versatile", // 2. Calidad
+                "gemma2-9b-it",            // 3. Respaldo Google
+                "mixtral-8x7b-32768"       // 4. Respaldo Mixtral
+            ];
 
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({ error: { message: response.statusText } }));
-                throw new Error(errData.error?.message || `Error Groq: ${response.status}`);
+            let aiText = "";
+            let lastError = null;
+
+            for (const modelId of MODELS) {
+                try {
+                    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: modelId,
+                            messages: [
+                                { role: "system", content: `Eres OLGA, asistente virtual en español. ${userInfo} IMPORTANTE: ERES ÚTIL Y BREVE. Responde siempre en Español.` },
+                                ...messagesRef.current.slice(-6).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })),
+                                { role: "user", content: text + "\n" + systemContext }
+                            ],
+                            max_tokens: 1200 // AUMENTADO PARA EVITAR CORTES
+                        }),
+                        signal: abortControllerRef.current.signal
+                    });
+
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        throw new Error(errData.error?.message || `Status ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    aiText = data.choices[0].message.content;
+                    break; // ¡Éxito! 
+                } catch (e) {
+                    console.warn(`⚠️ Falló ${modelId}:`, e.message);
+                    lastError = e;
+                    if (e.name === 'AbortError') throw e;
+                }
             }
 
-            const data = await response.json();
-            const aiText = data.choices[0].message.content;
+            if (!aiText) throw new Error(`Todos los cerebros fallaron. Último: ${lastError?.message}`);
 
             if (aiText.includes('GENERANDO_IMAGEN:')) {
                 setMessages(prev => [...prev, { role: 'ai', text: "🎨 Generando arte..." }]);
