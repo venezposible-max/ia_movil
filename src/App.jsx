@@ -1769,7 +1769,7 @@ export default function App() {
                     {isSensualMode ? '💋 RITA AI' : '⚡ OLGA AI'}
                 </h1>
                 <p style={{ fontSize: '0.75rem', opacity: 0.9, marginTop: '-5px', marginBottom: '8px', color: '#00f2ff', fontWeight: 'bold' }}>
-                    {isSensualMode ? 'Passion Mode • Uncensored' : `V2.6.0 • Brain: ${activeBrainModel}`}
+                    {isSensualMode ? 'Passion Mode • Uncensored' : `V2.6.1 • Brain: ${activeBrainModel}`}
                 </p>
                 <span style={{ fontSize: '0.6rem', color: '#fff', background: 'rgba(0,0,0,0.4)', padding: '5px 12px', borderRadius: '15px', display: 'flex', gap: '10px', fontWeight: 'bold' }}>
                     <span style={{ color: API_KEY?.length > 10 ? '#4caf50' : '#ff5555' }}>
